@@ -1,34 +1,33 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Global smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Remove default button styles */
+button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Smooth transitions for interactive elements */
+a, button {
+  transition: opacity 0.2s ease;
 }
 
-.App-link {
-    color: #61dafb;
+a:hover, button:hover {
+  opacity: 0.9;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Image optimization */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid hsl(var(--secondary));
+  outline-offset: 2px;
 }

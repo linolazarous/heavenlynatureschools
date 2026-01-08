@@ -1,53 +1,57 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from './components/ui/sonner';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import Home from './pages/Home';
+import About from './pages/About';
+import Vision from './pages/Vision';
+import Programs from './pages/Programs';
+import Governance from './pages/Governance';
+import Partnerships from './pages/Partnerships';
+import Support from './pages/Support';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
+import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
+import Contact from './pages/Contact';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminContacts from './pages/admin/AdminContacts';
+import AdminBlog from './pages/admin/AdminBlog';
+import AdminEvents from './pages/admin/AdminEvents';
+import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <Router>
+      <div className="App">
+        <Header />
+        <main>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/vision" element={<Vision />} />
+            <Route path="/programs" element={<Programs />} />
+            <Route path="/governance" element={<Governance />} />
+            <Route path="/partnerships" element={<Partnerships />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/events/:id" element={<EventDetail />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/contacts" element={<AdminContacts />} />
+            <Route path="/admin/blog" element={<AdminBlog />} />
+            <Route path="/admin/events" element={<AdminEvents />} />
+          </Routes>
+        </main>
+        <Footer />
+        <Toaster position="top-right" richColors />
+      </div>
+    </Router>
   );
 }
 
