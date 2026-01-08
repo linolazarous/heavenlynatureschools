@@ -1,0 +1,179 @@
+{
+  "brand_identity": {
+    "name": "Heavenly Nature Nursery & Primary School",
+    "mission": "Nurturing Right Leaders",
+    "tone": "Hopeful, Compassionate, Professional, Transparent, Faith-based",
+    "archetype": "The Nurturing Guardian",
+    "keywords": ["Hope", "Education", "Faith", "Transparency", "Growth"]
+  },
+  "typography": {
+    "primary_font": "Playfair Display",
+    "secondary_font": "DM Sans",
+    "accent_font": "Caveat",
+    "font_weights": {
+      "light": 300,
+      "regular": 400,
+      "medium": 500,
+      "bold": 700,
+      "black": 900
+    },
+    "usage": {
+      "h1": "font-serif text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]",
+      "h2": "font-serif text-4xl md:text-5xl font-semibold tracking-tight",
+      "h3": "font-serif text-2xl md:text-3xl font-medium",
+      "body": "font-sans text-base md:text-lg leading-relaxed text-muted-foreground",
+      "caption": "font-sans text-sm font-medium uppercase tracking-widest text-muted-foreground/80",
+      "handwritten": "font-accent text-2xl text-primary/80 -rotate-2"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "name": "Deep Navy",
+        "hex": "#001F5B",
+        "hsl": "220 100% 18%",
+        "usage": "Headings, Primary Buttons, Footer Background"
+      },
+      "secondary": {
+        "name": "Hope Gold",
+        "hex": "#F4B400",
+        "hsl": "44 100% 48%",
+        "usage": "Call to Actions (CTA), Highlights, Icons"
+      },
+      "accent": {
+        "name": "Soft Clay",
+        "hex": "#E6D5C3",
+        "hsl": "30 35% 83%",
+        "usage": "Background shapes, Secondary buttons"
+      },
+      "background": {
+        "name": "Warm Alabaster",
+        "hex": "#FDFBF7",
+        "hsl": "40 33% 98%",
+        "usage": "Main Page Background"
+      },
+      "surface": {
+        "name": "Pure White",
+        "hex": "#FFFFFF",
+        "hsl": "0 0% 100%",
+        "usage": "Cards, Modals, Input Fields"
+      },
+      "text": {
+        "primary": "#001F5B",
+        "secondary": "#4B5563",
+        "muted": "#9CA3AF"
+      }
+    },
+    "gradients": {
+      "hero_overlay": "linear-gradient(to bottom, rgba(0,31,91,0.4), rgba(0,31,91,0.8))",
+      "subtle_glow": "radial-gradient(circle at 50% 50%, rgba(244,180,0,0.15), transparent 70%)"
+    }
+  },
+  "visual_enhancers": {
+    "radius": {
+      "default": "0.75rem",
+      "button": "9999px",
+      "card": "1rem"
+    },
+    "shadows": {
+      "soft": "0 4px 20px -2px rgba(0, 31, 91, 0.08)",
+      "hover": "0 10px 25px -5px rgba(0, 31, 91, 0.12), 0 8px 10px -6px rgba(0, 31, 91, 0.1)"
+    },
+    "textures": {
+      "grain": "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E\")"
+    }
+  },
+  "layout_strategies": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "section_spacing": "py-20 md:py-32",
+    "grid_system": {
+      "bento": "grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8",
+      "feature_list": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-white hover:bg-primary/90 rounded-full px-8 py-6 text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1",
+      "secondary": "bg-secondary text-primary hover:bg-secondary/90 rounded-full px-8 py-6 text-lg font-medium shadow-md hover:shadow-lg transition-all duration-300",
+      "outline": "border-2 border-primary text-primary hover:bg-primary hover:text-white rounded-full px-8 py-6 text-lg font-medium transition-all duration-300",
+      "ghost": "text-primary hover:bg-primary/5 rounded-full px-6 py-4 font-medium"
+    },
+    "cards": {
+      "feature": "bg-white rounded-2xl p-8 shadow-soft hover:shadow-hover transition-all duration-300 border border-primary/5 group",
+      "testimonial": "bg-accent/20 rounded-2xl p-8 relative",
+      "stat": "bg-primary text-white rounded-2xl p-8 text-center"
+    },
+    "inputs": {
+      "default": "bg-white border-gray-200 focus:border-primary focus:ring-primary rounded-lg h-12 px-4"
+    }
+  },
+  "image_assets": {
+    "hero_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1521493959102-bdd6677fdd81?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Joyful students looking through a window",
+        "usage": "Main Hero Background",
+        "position": "center 20%"
+      },
+      {
+        "url": "https://images.unsplash.com/flagged/photo-1555251255-e9a095d6eb9d?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Laughing African school boys",
+        "usage": "About Us / Community Section"
+      }
+    ],
+    "classroom_images": [
+      {
+        "url": "https://images.unsplash.com/flagged/photo-1579133311477-9121405c78dd?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Nun teaching students in classroom",
+        "usage": "Programs / Faith-based Education Section"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1698827623362-f10eadf55a18?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Teacher interacting with students",
+        "usage": "Academic Excellence Section"
+      }
+    ],
+    "symbolic_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1763844599737-be3850c60cea?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Hands planting seeds in soil",
+        "usage": "Growth / Support Us Section"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1720420865912-2bbd6bfa1e85?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Holding a small plant",
+        "usage": "Donation / Impact Section"
+      }
+    ]
+  },
+  "motion_guidelines": {
+    "transitions": "transition-all duration-300 ease-out",
+    "hover_lift": "hover:-translate-y-1 hover:shadow-lg",
+    "fade_in": "animate-in fade-in duration-700 slide-in-from-bottom-4",
+    "stagger": "stagger-100"
+  },
+  "accessibility_rules": {
+    "contrast": "Ensure all text on colored backgrounds meets WCAG AA (4.5:1). Use 'text-white' on 'bg-primary'.",
+    "focus": "Visible focus rings on all interactive elements using 'focus-visible:ring-2 focus-visible:ring-secondary'.",
+    "labels": "All inputs must have visible labels or aria-labels.",
+    "alt_text": "All images must have descriptive alt text."
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install 'lucide-react' for icons. Use 'Playfair Display' from Google Fonts for headings and 'DM Sans' for body.",
+    "2. THEME: Update 'tailwind.config.js' with the custom colors defined in 'colors.palette'. Use HSL values for variable support.",
+    "3. LAYOUT: Build the 'Home' page first. Use the 'Hero Image' (boys in window) with a dark overlay gradient to ensure text readability.",
+    "4. COMPONENTS: Use Shadcn UI for the 'Admin' dashboard but CUSTOM HTML/Tailwind for the public marketing pages to ensure unique branding.",
+    "5. NAVIGATION: Create a sticky header with a glassmorphism effect (backdrop-blur-md bg-white/80).",
+    "6. FORMS: Use Netlify forms attributes (name='contact', method='POST', data-netlify='true') for the Contact and Support pages.",
+    "7. ADMIN: Secure the '/admin' route. Use a simple login layout.",
+    "8. FOOTER: Large footer with 'Deep Navy' background, 4 columns, and a newsletter signup.",
+    "9. TESTID: Add 'data-testid' to all buttons, links, and inputs."
+  ],
+  "universal_guidelines": [
+    "Avoid generic 'AI slop' designs. Use generous spacing (py-24, py-32).",
+    "Do not use gradients for text unless specifically requested.",
+    "Use 'sonner' for toast notifications.",
+    "Ensure mobile responsiveness for all images (max-h-[60vh] on mobile).",
+    "Use 'lucide-react' for icons."
+  ]
+}
