@@ -1,38 +1,3 @@
-#!/bin/bash
-
-# Script to prepare the website for ZIP download
-
-echo "🚀 Preparing Heavenly Nature Schools website for deployment..."
-
-# Navigate to frontend directory
-cd /app/frontend
-
-# Install dependencies if not already installed
-echo "📦 Installing dependencies..."
-yarn install
-
-# Build the production version
-echo "🏗️  Building production version..."
-yarn build
-
-# Create a deployment package directory
-echo "📁 Creating deployment package..."
-cd /app
-mkdir -p deployment-package
-
-# Copy essential files
-cp -r frontend/build deployment-package/
-cp -r frontend/public deployment-package/
-cp frontend/netlify.toml deployment-package/
-cp frontend/package.json deployment-package/
-cp DEPLOYMENT.md deployment-package/
-cp README.md deployment-package/
-
-# Create a netlify folder structure for functions (if needed in future)
-mkdir -p deployment-package/netlify/functions
-
-# Create instructions file
-cat > deployment-package/QUICK_START.txt << 'EOF'
 HEAVENLY NATURE SCHOOLS WEBSITE - DEPLOYMENT PACKAGE
 ====================================================
 
@@ -89,28 +54,3 @@ WEBSITE URLS:
 
 © 2023-2025 Heavenly Nature Nursery & Primary School
 A ministry of Heavenly Nature Ministry
-EOF
-
-# Create the ZIP file
-echo "📦 Creating ZIP archive..."
-cd deployment-package
-zip -r ../heavenlynature-website.zip . -x "*.DS_Store" -x "*node_modules*"
-
-cd /app
-
-echo ""
-echo "✅ SUCCESS! Deployment package created."
-echo ""
-echo "📦 ZIP FILE LOCATION: /app/heavenlynature-website.zip"
-echo ""
-echo "📝 WHAT TO DO NEXT:"
-echo "   1. Download the ZIP file: heavenlynature-website.zip"
-echo "   2. Extract it on your local machine"
-echo "   3. Read DEPLOYMENT.md for complete deployment instructions"
-echo "   4. Deploy the 'build' folder to Netlify"
-echo ""
-echo "🎉 Your website is ready for deployment!"
-echo ""
-
-# Show ZIP file size
-ls -lh /app/heavenlynature-website.zip
