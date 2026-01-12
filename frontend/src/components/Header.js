@@ -46,7 +46,7 @@ const Header = () => {
             />
             <div>
               <h1 className="font-serif text-lg md:text-xl font-bold text-primary leading-tight">
-                HEAVENLY NATURE SCHOOLS
+                HEAVENLY NATURE NURSERY & PRIMARY SCHOOL
               </h1>
               <p className="text-xs text-muted-foreground">Nurturing Right Leaders</p>
             </div>
