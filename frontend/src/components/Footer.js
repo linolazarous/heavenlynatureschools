@@ -93,12 +93,6 @@ const Footer = () => {
                 </a>
               </div>
               <div className="flex items-center space-x-3">
-                <Phone size={20} className="flex-shrink-0" />
-                <a href="https://wa.me/211926006202" className="text-sm hover:text-white" data-testid="footer-whatsapp">
-                  +211 926 006 202 (WhatsApp)
-                </a>
-              </div>
-              <div className="flex items-center space-x-3">
                 <Mail size={20} className="flex-shrink-0" />
                 <a href="mailto:info@heavenlynatureschools.com" className="text-sm hover:text-white" data-testid="footer-email">
                   info@heavenlynatureschools.com
