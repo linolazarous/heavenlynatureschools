@@ -1,192 +1,99 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { DollarSign, Users, Heart, Briefcase, ArrowRight } from 'lucide-react';
+import {
+  DollarSign,
+  Users,
+  Heart,
+  Briefcase,
+  ArrowRight,
+  Copy,
+  MessageCircle,
+  CreditCard
+} from 'lucide-react';
+
+const bankDetails = `
+Bank Name: EDEN COMMERCIAL BANK PLC
+Account Name: HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL
+Account Number: 43081
+Currency: USD / SSP
+`;
 
 const Support = () => {
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(bankDetails);
+    alert('Bank details copied to clipboard');
+  };
+
   return (
-    <div className="min-h-screen pt-24" data-testid="support-page">
-      <section
-        className="py-32 bg-cover bg-center relative"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(0,31,91,0.85), rgba(0,31,91,0.85)), url(https://images.unsplash.com/photo-1720420865912-2bbd6bfa1e85?crop=entropy&cs=srgb&fm=jpg&q=85)'
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white relative z-10">
-          <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6">
-            Make a Difference
-          </h1>
-          <p className="text-xl md:text-2xl text-white/95 max-w-3xl mx-auto">
-            Your support transforms lives and nurtures future leaders
-          </p>
-        </div>
+    <div className="min-h-screen pt-24">
+      {/* HERO */}
+      <section className="py-32 bg-primary text-white text-center">
+        <h1 className="font-serif text-6xl font-bold mb-4">Make a Difference</h1>
+        <p className="text-xl">
+          Your support transforms lives and nurtures future leaders
+        </p>
       </section>
 
-      <section className="py-20 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="font-serif text-4xl md:text-5xl font-semibold text-primary mb-6">
-              Ways to Get Involved
+      <section className="py-20">
+        <div className="max-w-6xl mx-auto px-6">
+
+          {/* BANK DETAILS */}
+          <div className="bg-accent/30 rounded-2xl p-10 text-center mb-12">
+            <h2 className="font-serif text-3xl font-semibold text-primary mb-6">
+              Bank Donation Details
             </h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Every contribution, big or small, makes a lasting impact on a child's life
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
-            <div className="bg-white rounded-2xl p-10 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="support-donations">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <DollarSign size={36} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-3xl font-medium text-primary mb-4">
-                Financial Donations
-              </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Your financial support directly funds our operations, providing free education, meals, and care to
-                children in need.
-              </p>
-              <div className="space-y-3 text-muted-foreground">
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span><strong className="text-primary">$50</strong> provides school supplies for one child for a year</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span><strong className="text-primary">$100</strong> covers meals for one child for three months</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span><strong className="text-primary">$500</strong> sponsors a child's full education for one year</span>
-                </p>
-              </div>
+            <div className="text-lg text-muted-foreground space-y-2 mb-6">
+              <p><strong>Bank:</strong> EDEN COMMERCIAL BANK PLC</p>
+              <p><strong>Account Name:</strong> HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL</p>
+              <p><strong>Account Number:</strong> 43081</p>
+              <p><strong>Currency:</strong> USD / SSP</p>
             </div>
 
-            <div className="bg-white rounded-2xl p-10 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="support-volunteer">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Users size={36} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-3xl font-medium text-primary mb-4">
-                Volunteer Your Time
-              </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Share your skills and passion by volunteering at our school. We welcome teachers, mentors, and support staff.
-              </p>
-              <div className="space-y-3 text-muted-foreground">
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Teaching and tutoring</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Mentorship and counseling</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Administrative support</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Skills training and workshops</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-10 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="support-inkind">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Heart size={36} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-3xl font-medium text-primary mb-4">
-                In-Kind Donations
-              </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Donate books, school supplies, clothing, food items, or other resources that support our programs.
-              </p>
-              <div className="space-y-3 text-muted-foreground">
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Books and educational materials</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>School uniforms and clothing</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Sports equipment and supplies</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Computers and technology</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-10 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="support-partnerships">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Briefcase size={36} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-3xl font-medium text-primary mb-4">
-                Corporate Partnerships
-              </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Partner with us as a corporate sponsor to create meaningful impact while fulfilling your CSR goals.
-              </p>
-              <div className="space-y-3 text-muted-foreground">
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Sponsorship programs</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Employee volunteer programs</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Matching gift programs</span>
-                </p>
-                <p className="flex items-start">
-                  <span className="text-secondary mr-3 mt-1">•</span>
-                  <span>Technical expertise and resources</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-primary to-primary/90 text-white rounded-2xl p-10 md:p-12 text-center mb-12">
-            <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-6">
-              Your Impact Matters
-            </h2>
-            <p className="text-xl text-white/95 max-w-3xl mx-auto leading-relaxed mb-8">
-              Every donation, every hour volunteered, and every partnership formed brings us closer to our goal of
-              providing quality education to every child in need. Together, we are nurturing the leaders of tomorrow.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link
-                to="/contact"
-                className="bg-secondary text-primary hover:bg-secondary/90 rounded-full px-8 py-4 text-lg font-medium transition-all duration-300 inline-flex items-center"
-                data-testid="support-contact-btn"
+            <div className="flex flex-wrap gap-4 justify-center">
+              {/* COPY BUTTON */}
+              <button
+                onClick={copyToClipboard}
+                className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full"
               >
-                Get in Touch
-                <ArrowRight className="ml-2" size={20} />
-              </Link>
+                <Copy size={18} /> Copy Bank Details
+              </button>
+
+              {/* WHATSAPP BUTTON */}
               <a
-                href="mailto:info@heavenlynatureschools.com"
-                className="border-2 border-white text-white hover:bg-white hover:text-primary rounded-full px-8 py-4 text-lg font-medium transition-all duration-300"
-                data-testid="support-email-btn"
+                href="https://wa.me/211922273334?text=Hello%20I%20would%20like%20to%20support%20Heavenly%20Nature%20Nursery%20%26%20Primary%20School"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-full"
               >
-                Email Us
+                <MessageCircle size={18} /> WhatsApp Donation Inquiry
               </a>
             </div>
           </div>
 
-          <div className="bg-accent/30 rounded-2xl p-10 text-center">
-            <h2 className="font-serif text-3xl font-semibold text-primary mb-4">
-              Bank Details (Coming Soon)
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              We are currently setting up our donation infrastructure. Please <Link to="/contact" className="text-primary underline">contact us</Link> directly to discuss how you can support our mission.
+          {/* STRIPE COMING SOON */}
+          <div className="bg-white border border-primary/10 rounded-2xl p-10 text-center mb-12">
+            <CreditCard size={40} className="mx-auto text-primary mb-4" />
+            <h3 className="font-serif text-2xl font-semibold text-primary mb-2">
+              Online Card Payments
+            </h3>
+            <p className="text-muted-foreground text-lg">
+              Stripe online payments are <strong>COMING SOON</strong>.
+              <br />
+              Please use bank transfer or WhatsApp for now.
             </p>
           </div>
+
+          {/* CTA */}
+          <div className="text-center">
+            <Link
+              to="/contact"
+              className="inline-flex items-center gap-2 bg-secondary text-primary px-8 py-4 rounded-full text-lg"
+            >
+              Contact Us <ArrowRight size={20} />
+            </Link>
+          </div>
+
         </div>
       </section>
     </div>
