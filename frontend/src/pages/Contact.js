@@ -163,11 +163,6 @@ const Contact = () => {
                         +211 922 273 334
                       </a>
                     </p>
-                    <p className="text-muted-foreground">
-                      <a href="https://wa.me/211922273334" className="hover:text-primary" data-testid="contact-whatsapp-link">
-                        +211 922 273 334 (WhatsApp)
-                      </a>
-                    </p>
                   </div>
                 </div>
 
