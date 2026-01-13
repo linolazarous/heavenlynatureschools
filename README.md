@@ -64,7 +64,7 @@ netlify deploy --prod
 
 - **Email**: info@heavenlynatureschools.com
 - **Phone**: +211 922 273 334
-- **WhatsApp**: +211 926 006 202
+- **WhatsApp**: +211 922 273 334
 - **Location**: Juba City, Central Equatoria State, South Sudan
 
 ## 🔗 Social Media
