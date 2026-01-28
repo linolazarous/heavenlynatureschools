@@ -4,7 +4,7 @@ uvicorn[standard]==0.25.0
 
 # MongoDB driver
 motor==3.3.1
-pymongo==4.5.0
+pymongo==4.6.3
 
 # Environment variables
 python-dotenv>=1.0.1
