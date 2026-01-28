@@ -1,4 +1,6 @@
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -92,7 +94,7 @@ app.include_router(api_router)
 
 
 # ==============================
-# CORS Middleware (Production-ready)
+# CORS Middleware
 # ==============================
 cors_origins = os.environ.get(
     'CORS_ORIGINS',
@@ -106,6 +108,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==============================
+# Root redirect and favicon
+# ==============================
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/api/")
+
+# Serve static files (like favicon.ico)
+app.mount("/static", StaticFiles(directory=ROOT_DIR / "static"), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = ROOT_DIR / "static" / "favicon.ico"
+    if favicon_path.exists():
+        return FileResponse(favicon_path)
+    return RedirectResponse(url="/static/favicon.ico")
 
 
 # ==============================
