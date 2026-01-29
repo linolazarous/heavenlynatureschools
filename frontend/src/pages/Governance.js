@@ -1,145 +1,132 @@
-import React from 'react';
-import { Users, GraduationCap, Network } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { Users, GraduationCap, Network } from "lucide-react";
+import api from "../services/api";
 
 const Governance = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchGovernance = async () => {
+      try {
+        const res = await api.get("/governance");
+        setData(res.data);
+      } catch (error) {
+        console.error("Failed to load governance data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGovernance();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-24 flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">Loading governance data...</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen pt-24 flex items-center justify-center">
+        <p className="text-xl text-muted-foreground">
+          Governance information is currently unavailable.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen pt-24" data-testid="governance-page">
+    <div className="min-h-screen pt-24">
       <section className="py-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* Header */}
           <div className="text-center mb-16">
             <h1 className="font-serif text-5xl md:text-6xl font-bold text-primary mb-6">
-              Governance & Leadership
+              {data.intro?.title}
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Transparent, accountable leadership guiding our mission
+              {data.intro?.subtitle}
             </p>
           </div>
 
+          {/* Board + Management */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
-            <div className="bg-white rounded-2xl p-10 shadow-lg border border-primary/5" data-testid="governance-board">
+
+            {/* Board */}
+            <div className="bg-white rounded-2xl p-10 shadow-lg border border-primary/5">
               <div className="flex items-center space-x-3 mb-6">
                 <Users size={40} className="text-secondary" />
-                <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary">
+                <h2 className="font-serif text-3xl font-semibold text-primary">
                   School Board of Directors
                 </h2>
               </div>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Our School Board of Directors provides strategic oversight and governance, ensuring that our school
-                operates with integrity, accountability, and excellence.
+
+              <p className="text-lg text-muted-foreground mb-6">
+                {data.board?.description}
               </p>
-              <div className="space-y-4">
-                <h3 className="font-serif text-xl font-semibold text-primary">Board Responsibilities:</h3>
-                <ul className="space-y-3 text-muted-foreground">
-                  <li className="flex items-start">
+
+              <ul className="space-y-3 text-muted-foreground">
+                {data.board?.responsibilities?.map((item, idx) => (
+                  <li key={idx} className="flex items-start">
                     <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Strategic planning and policy development</span>
+                    <span>{item}</span>
                   </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Financial oversight and resource management</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Ensuring adherence to mission and values</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Community relations and partnerships</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Monitoring school performance and impact</span>
-                  </li>
-                </ul>
-              </div>
+                ))}
+              </ul>
             </div>
 
-            <div className="bg-white rounded-2xl p-10 shadow-lg border border-primary/5" data-testid="governance-management">
+            {/* Management */}
+            <div className="bg-white rounded-2xl p-10 shadow-lg border border-primary/5">
               <div className="flex items-center space-x-3 mb-6">
                 <Network size={40} className="text-secondary" />
-                <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary">
+                <h2 className="font-serif text-3xl font-semibold text-primary">
                   School Management Committee
                 </h2>
               </div>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                The School Management Committee works closely with school leadership to oversee daily operations and
-                ensure quality education delivery.
+
+              <p className="text-lg text-muted-foreground mb-6">
+                {data.management?.description}
               </p>
-              <div className="space-y-4">
-                <h3 className="font-serif text-xl font-semibold text-primary">Committee Functions:</h3>
-                <ul className="space-y-3 text-muted-foreground">
-                  <li className="flex items-start">
+
+              <ul className="space-y-3 text-muted-foreground">
+                {data.management?.functions?.map((item, idx) => (
+                  <li key={idx} className="flex items-start">
                     <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Academic program oversight</span>
+                    <span>{item}</span>
                   </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Staff supervision and development</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Student welfare and discipline</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Infrastructure and facilities management</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-secondary mr-3 mt-1">•</span>
-                    <span>Coordination with stakeholders</span>
-                  </li>
-                </ul>
-              </div>
+                ))}
+              </ul>
             </div>
           </div>
 
-          <div className="bg-primary text-white rounded-2xl p-10 shadow-lg mb-12" data-testid="governance-headteacher">
+          {/* Head Teacher */}
+          <div className="bg-primary text-white rounded-2xl p-10 shadow-lg mb-12">
             <div className="flex items-center space-x-3 mb-6">
               <GraduationCap size={48} className="text-secondary" />
-              <h2 className="font-serif text-3xl md:text-4xl font-semibold">
+              <h2 className="font-serif text-3xl font-semibold">
                 Head Teacher's Leadership
               </h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <p className="text-lg text-white/95 leading-relaxed mb-6">
-                  The Head Teacher is the chief academic and administrative officer of the school, responsible for
-                  implementing the vision and policies set by the Board and Management Committee.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-serif text-xl font-semibold mb-4">Key Responsibilities:</h3>
-                <ul className="space-y-2 text-white/90">
-                  <li className="flex items-start">
-                    <span className="mr-2">•</span>
-                    <span>Educational leadership and curriculum implementation</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">•</span>
-                    <span>Staff recruitment, training, and evaluation</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">•</span>
-                    <span>Student enrollment and academic progress monitoring</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">•</span>
-                    <span>Community engagement and parent relations</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+
+            <p className="text-lg text-white/95 mb-6">
+              {data.headTeacher?.description}
+            </p>
+
+            <ul className="space-y-2 text-white/90">
+              {data.headTeacher?.responsibilities?.map((item, idx) => (
+                <li key={idx} className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <div className="bg-accent/30 rounded-2xl p-10 text-center">
-            <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary mb-6">
-              Committed to Transparency
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              We operate with full transparency and accountability to our students, staff, donors, and the wider community.
-              Our governance structures ensure that every decision serves the best interests of the children we serve.
-            </p>
-          </div>
         </div>
       </section>
     </div>
