@@ -1,52 +1,69 @@
-// src/services/api.js
-import axios from 'axios';
+import axios from "axios";
 
-// Base API URL
-const API_BASE = "https://heavenlynatureschools-qpvf.onrender.com/api";
+// Base API URL (Render backend)
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "https://your-backend.onrender.com/api";
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
-// ===== Request Interceptor =====
+// ==============================
+// REQUEST INTERCEPTOR
+// ==============================
 api.interceptors.request.use(
-  config => {
-    // Add Authorization header if token exists
-    const token = localStorage.getItem('token'); // or from context/state
+  (config) => {
+    const token = localStorage.getItem("access_token");
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    console.log(`[API Request] ${config.method.toUpperCase()} ${config.url}`, config.data || '');
+    console.log(
+      `[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`,
+      config.data || ""
+    );
+
     return config;
   },
-  error => {
-    console.error('[API Request Error]', error);
+  (error) => {
+    console.error("[API REQUEST ERROR]", error);
     return Promise.reject(error);
   }
 );
 
-// ===== Response Interceptor =====
+// ==============================
+// RESPONSE INTERCEPTOR
+// ==============================
 api.interceptors.response.use(
-  response => {
-    console.log(`[API Response] ${response.status} ${response.config.url}`, response.data);
-    return response.data; // Return only the data
+  (response) => {
+    console.log(
+      `[API RESPONSE] ${response.config.url}`,
+      response.status
+    );
+    return response;
   },
-  error => {
+  (error) => {
     if (error.response) {
-      console.error(`[API Error] ${error.response.status} ${error.response.config.url}`, error.response.data);
+      console.error(
+        "[API RESPONSE ERROR]",
+        error.response.status,
+        error.response.data
+      );
+
+      // Optional: auto logout on 401
       if (error.response.status === 401) {
-        console.warn('Unauthorized! Redirecting to login...');
-        // Optional: redirect to login if token expired
-        window.location.href = '/admin/login';
+        localStorage.removeItem("access_token");
+        window.location.href = "/admin/login";
       }
     } else {
-      console.error('[API Network Error]', error.message);
+      console.error("[API NETWORK ERROR]", error.message);
     }
+
     return Promise.reject(error);
   }
 );
