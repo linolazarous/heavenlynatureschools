@@ -1,26 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  DollarSign,
-  Users,
-  Heart,
-  Briefcase,
-  ArrowRight,
-  Copy,
-  MessageCircle,
-  CreditCard
-} from 'lucide-react';
-
-const bankDetails = `
-Bank Name: EDEN COMMERCIAL BANK PLC
-Account Name: HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL
-Account Number: 43081
-Currency: USD / SSP
-`;
+import { DollarSign, Users, Heart, Briefcase, ArrowRight, Copy, MessageCircle, CreditCard } from 'lucide-react';
+import api from '../services/api';
 
 const Support = () => {
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(bankDetails);
+  const [donationMethods, setDonationMethods] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDonationMethods = async () => {
+      try {
+        const response = await api.get('/donations'); // GET /api/donations
+        setDonationMethods(response.data);
+      } catch (error) {
+        console.error('Failed to fetch donation methods', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDonationMethods();
+  }, []);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
     alert('Bank details copied to clipboard');
   };
 
@@ -29,60 +32,62 @@ const Support = () => {
       {/* HERO */}
       <section className="py-32 bg-primary text-white text-center">
         <h1 className="font-serif text-6xl font-bold mb-4">Make a Difference</h1>
-        <p className="text-xl">
-          Your support transforms lives and nurtures future leaders
-        </p>
+        <p className="text-xl">Your support transforms lives and nurtures future leaders</p>
       </section>
 
       <section className="py-20">
         <div className="max-w-6xl mx-auto px-6">
 
-          {/* BANK DETAILS */}
-          <div className="bg-accent/30 rounded-2xl p-10 text-center mb-12">
-            <h2 className="font-serif text-3xl font-semibold text-primary mb-6">
-              Bank Donation Details
-            </h2>
+          {loading ? (
+            <p className="text-center text-muted-foreground">Loading donation options...</p>
+          ) : (
+            donationMethods.map((method, idx) => (
+              <div key={idx} className="bg-accent/30 rounded-2xl p-10 text-center mb-12">
+                <h2 className="font-serif text-3xl font-semibold text-primary mb-6">
+                  {method.name}
+                </h2>
 
-            <div className="text-lg text-muted-foreground space-y-2 mb-6">
-              <p><strong>Bank:</strong> EDEN COMMERCIAL BANK PLC</p>
-              <p><strong>Account Name:</strong> HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL</p>
-              <p><strong>Account Number:</strong> 43081</p>
-              <p><strong>Currency:</strong> USD / SSP</p>
-            </div>
+                {method.type === 'bank' && (
+                  <>
+                    <div className="text-lg text-muted-foreground space-y-2 mb-6">
+                      <p><strong>Bank:</strong> {method.bankName}</p>
+                      <p><strong>Account Name:</strong> {method.accountName}</p>
+                      <p><strong>Account Number:</strong> {method.accountNumber}</p>
+                      <p><strong>Currency:</strong> {method.currency}</p>
+                    </div>
 
-            <div className="flex flex-wrap gap-4 justify-center">
-              {/* COPY BUTTON */}
-              <button
-                onClick={copyToClipboard}
-                className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full"
-              >
-                <Copy size={18} /> Copy Bank Details
-              </button>
+                    <button
+                      onClick={() => copyToClipboard(`${method.bankName}\n${method.accountName}\n${method.accountNumber}\n${method.currency}`)}
+                      className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full"
+                    >
+                      <Copy size={18} /> Copy Bank Details
+                    </button>
+                  </>
+                )}
 
-              {/* WHATSAPP BUTTON */}
-              <a
-                href="https://wa.me/211922273334?text=Hello%20I%20would%20like%20to%20support%20Heavenly%20Nature%20Nursery%20%26%20Primary%20School"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-full"
-              >
-                <MessageCircle size={18} /> WhatsApp Donation Inquiry
-              </a>
-            </div>
-          </div>
+                {method.type === 'whatsapp' && (
+                  <a
+                    href={method.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-full"
+                  >
+                    <MessageCircle size={18} /> WhatsApp Donation Inquiry
+                  </a>
+                )}
 
-          {/* STRIPE COMING SOON */}
-          <div className="bg-white border border-primary/10 rounded-2xl p-10 text-center mb-12">
-            <CreditCard size={40} className="mx-auto text-primary mb-4" />
-            <h3 className="font-serif text-2xl font-semibold text-primary mb-2">
-              Online Card Payments
-            </h3>
-            <p className="text-muted-foreground text-lg">
-              Stripe online payments are <strong>COMING SOON</strong>.
-              <br />
-              Please use bank transfer or WhatsApp for now.
-            </p>
-          </div>
+                {method.type === 'online' && (
+                  <div className="bg-white border border-primary/10 rounded-2xl p-10 text-center mt-6">
+                    <CreditCard size={40} className="mx-auto text-primary mb-4" />
+                    <h3 className="font-serif text-2xl font-semibold text-primary mb-2">
+                      {method.name}
+                    </h3>
+                    <p className="text-muted-foreground text-lg">{method.note}</p>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
 
           {/* CTA */}
           <div className="text-center">
