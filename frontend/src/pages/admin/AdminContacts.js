@@ -1,27 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowLeft, Trash2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 const AdminContacts = () => {
-  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
 
-  useEffect(() => {
-    if (window.netlifyIdentity) {
-      const currentUser = window.netlifyIdentity.currentUser();
-      if (!currentUser) {
-        navigate('/admin/login');
-      }
-    }
-
-    loadContacts();
-  }, [navigate]);
-
+  // Load contacts from localStorage
   const loadContacts = () => {
     const storedContacts = JSON.parse(localStorage.getItem('contacts') || '[]');
     setContacts(storedContacts);
   };
+
+  useEffect(() => {
+    loadContacts();
+
+    // Listen to localStorage changes for real-time updates
+    const handleStorage = () => loadContacts();
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const handleDelete = (id) => {
     if (window.confirm('Are you sure you want to delete this message?')) {
@@ -32,28 +30,25 @@ const AdminContacts = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
-  };
 
   return (
     <div className="min-h-screen bg-background" data-testid="admin-contacts-page">
       <div className="bg-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center space-x-4">
-            <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
-              <ArrowLeft size={24} />
-            </Link>
-            <div className="flex items-center space-x-3">
-              <Mail size={32} />
-              <h1 className="font-serif text-2xl font-bold">Manage Contacts</h1>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center space-x-4">
+          <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
+            <ArrowLeft size={24} />
+          </Link>
+          <div className="flex items-center space-x-3">
+            <Mail size={32} />
+            <h1 className="font-serif text-2xl font-bold">Manage Contacts</h1>
           </div>
         </div>
       </div>
@@ -74,9 +69,7 @@ const AdminContacts = () => {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="font-serif text-xl font-semibold text-primary mb-2">
-                      {contact.name}
-                    </h3>
+                    <h3 className="font-serif text-xl font-semibold text-primary mb-2">{contact.name}</h3>
                     <p className="text-muted-foreground text-sm mb-1">
                       <strong>Email:</strong> {contact.email}
                     </p>
