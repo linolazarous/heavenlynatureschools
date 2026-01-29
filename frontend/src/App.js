@@ -15,11 +15,15 @@ import BlogPost from './pages/BlogPost';
 import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
 import Contact from './pages/Contact';
+
+// Admin pages
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
+import AdminRoute from './pages/admin/AdminRoute';
+
 import './App.css';
 
 function App() {
@@ -29,6 +33,7 @@ function App() {
         <Header />
         <main>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/vision" element={<Vision />} />
@@ -41,11 +46,13 @@ function App() {
             <Route path="/events" element={<Events />} />
             <Route path="/events/:id" element={<EventDetail />} />
             <Route path="/contact" element={<Contact />} />
+
+            {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/contacts" element={<AdminContacts />} />
-            <Route path="/admin/blog" element={<AdminBlog />} />
-            <Route path="/admin/events" element={<AdminEvents />} />
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
+            <Route path="/admin/blog" element={<AdminRoute><AdminBlog /></AdminRoute>} />
+            <Route path="/admin/events" element={<AdminRoute><AdminEvents /></AdminRoute>} />
           </Routes>
         </main>
         <Footer />
