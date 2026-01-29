@@ -1,7 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Handshake, Shield, Users } from 'lucide-react';
+import api from '../services/api';
 
 const Partnerships = () => {
+  const [partners, setPartners] = useState([]);
+
+  useEffect(() => {
+    const fetchPartners = async () => {
+      try {
+        const response = await api.get('/partnerships');
+        setPartners(response.data); // expects an array of partners
+      } catch (error) {
+        console.error('Failed to fetch partnerships', error);
+      }
+    };
+
+    fetchPartners();
+  }, []);
+
   return (
     <div className="min-h-screen pt-24" data-testid="partnerships-page">
       <section className="py-20 bg-background">
@@ -16,44 +32,29 @@ const Partnerships = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-20">
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="partnership-gess">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Handshake size={32} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-2xl font-medium text-primary mb-4">
-                GESS (Girls' Education South Sudan)
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                We are proud members of GESS, working together to improve access to quality education for all children,
-                with a special focus on girls' education in South Sudan.
+            {partners.length > 0 ? (
+              partners.map((partner) => (
+                <div
+                  key={partner.id}
+                  className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group"
+                  data-testid={`partnership-${partner.id}`}
+                >
+                  <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                    {partner.icon === 'Handshake' && <Handshake size={32} className="text-primary" />}
+                    {partner.icon === 'Users' && <Users size={32} className="text-primary" />}
+                    {partner.icon === 'Shield' && <Shield size={32} className="text-primary" />}
+                  </div>
+                  <h3 className="font-serif text-2xl font-medium text-primary mb-4">
+                    {partner.name}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">{partner.description}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-center col-span-3 text-muted-foreground">
+                Loading partnerships...
               </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="partnership-nec">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Users size={32} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-2xl font-medium text-primary mb-4">
-                National Education Cluster
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Through the National Education Cluster, we coordinate with government agencies and NGOs to strengthen
-                education systems and share best practices.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/5 group" data-testid="partnership-protection">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Shield size={32} className="text-primary" />
-              </div>
-              <h3 className="font-serif text-2xl font-medium text-primary mb-4">
-                Protection & Child Protection Cluster
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                We actively participate in child protection initiatives, ensuring the safety and wellbeing of every child
-                under our care and in the wider community.
-              </p>
-            </div>
+            )}
           </div>
 
           <div className="bg-gradient-to-br from-primary to-primary/90 text-white rounded-2xl p-10 md:p-12 mb-12">
