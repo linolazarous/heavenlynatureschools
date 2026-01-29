@@ -19,11 +19,13 @@ const AdminLogin = () => {
       window.netlifyIdentity.on('login', () => {
         navigate('/admin');
       });
+    } else {
+      setIsLoading(false);
     }
   }, [navigate]);
 
   const handleLogin = () => {
-    if (window.netlifyIdentify) {
+    if (window.netlifyIdentity) {   // ✅ fixed typo
       window.netlifyIdentity.open();
     } else {
       toast.error('Authentication service not available');
