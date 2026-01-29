@@ -1,7 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Heart, BookOpen, Users, Award } from 'lucide-react';
+import api from '../services/api';
+
+const iconMap = {
+  Heart: <Heart size={40} className="text-secondary" />,
+  BookOpen: <BookOpen size={40} className="text-secondary" />,
+};
 
 const Programs = () => {
+  const [programs, setPrograms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const response = await api.get('/programs'); // GET /api/programs
+        setPrograms(response.data);
+      } catch (error) {
+        console.error('Failed to fetch programs', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPrograms();
+  }, []);
+
   return (
     <div className="min-h-screen pt-24" data-testid="programs-page">
       <section className="py-20 bg-background">
@@ -15,89 +39,48 @@ const Programs = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden" data-testid="program-rehabilitation">
-              <div className="h-64 bg-cover bg-center" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1763844599737-be3850c60cea?crop=entropy&cs=srgb&fm=jpg&q=85)' }}></div>
-              <div className="p-10">
-                <div className="flex items-center space-x-3 mb-6">
-                  <Heart size={40} className="text-secondary" />
-                  <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary">
-                    Rehabilitation & Reformation
-                  </h2>
+          {loading ? (
+            <p className="text-center text-muted-foreground">Loading programs...</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
+              {programs.map((program) => (
+                <div
+                  key={program.id}
+                  className="bg-white rounded-2xl shadow-xl overflow-hidden"
+                  data-testid={`program-${program.id}`}
+                >
+                  <div
+                    className="h-64 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${program.image})` }}
+                  ></div>
+                  <div className="p-10">
+                    <div className="flex items-center space-x-3 mb-6">
+                      {iconMap[program.icon] || <Users size={40} className="text-secondary" />}
+                      <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary">
+                        {program.title}
+                      </h2>
+                    </div>
+                    <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+                      {program.description}
+                    </p>
+                    {program.components && program.components.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="font-serif text-xl font-semibold text-primary">Program Components:</h3>
+                        <ul className="space-y-3 text-muted-foreground">
+                          {program.components.map((comp, idx) => (
+                            <li key={idx} className="flex items-start">
+                              <span className="text-secondary mr-3 mt-1">•</span>
+                              <span dangerouslySetInnerHTML={{ __html: comp }} />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                  Our rehabilitation program provides a safe haven for street children and abandoned children, offering
-                  them the care and support they need to heal and thrive.
-                </p>
-                <div className="space-y-4">
-                  <h3 className="font-serif text-xl font-semibold text-primary">Program Components:</h3>
-                  <ul className="space-y-3 text-muted-foreground">
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Safe Environment:</strong> A secure, nurturing space where children can feel protected</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Nutritious Meals:</strong> Regular, healthy meals to support physical development</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Emotional Support:</strong> Counseling and mentorship to address trauma</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Life Skills Training:</strong> Practical skills for daily living and personal development</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Spiritual Guidance:</strong> Faith-based teachings to build character and hope</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+              ))}
             </div>
-
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden" data-testid="program-education">
-              <div className="h-64 bg-cover bg-center" style={{ backgroundImage: 'url(https://images.unsplash.com/flagged/photo-1579133311477-9121405c78dd?crop=entropy&cs=srgb&fm=jpg&q=85)' }}></div>
-              <div className="p-10">
-                <div className="flex items-center space-x-3 mb-6">
-                  <BookOpen size={40} className="text-secondary" />
-                  <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary">
-                    Nursery & Primary Education
-                  </h2>
-                </div>
-                <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                  We offer a comprehensive, faith-based curriculum that combines academic excellence with character
-                  development, preparing students for success.
-                </p>
-                <div className="space-y-4">
-                  <h3 className="font-serif text-xl font-semibold text-primary">Educational Offerings:</h3>
-                  <ul className="space-y-3 text-muted-foreground">
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Nursery Level:</strong> Foundation in literacy, numeracy, and social skills</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Primary Level:</strong> Comprehensive curriculum aligned with national standards</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Christian Education:</strong> Bible studies and moral teachings</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Extra-Curricular Activities:</strong> Sports, arts, and leadership programs</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-secondary mr-3 mt-1">•</span>
-                      <span><strong className="text-primary">Qualified Teachers:</strong> Dedicated educators committed to student success</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           <div className="bg-gradient-to-br from-secondary to-secondary/80 rounded-2xl p-10 md:p-12 mb-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
