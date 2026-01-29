@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Edit, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '../../services/api';
 
 const AdminBlog = () => {
   const navigate = useNavigate();
@@ -13,9 +14,10 @@ const AdminBlog = () => {
     excerpt: '',
     content: '',
     imageUrl: '',
-    publishDate: new Date().toISOString().split('T')[0]
+    publishDate: new Date().toISOString().split('T')[0],
   });
 
+  // Load posts from API
   useEffect(() => {
     if (window.netlifyIdentity) {
       const currentUser = window.netlifyIdentity.currentUser();
@@ -23,45 +25,45 @@ const AdminBlog = () => {
         navigate('/admin/login');
       }
     }
-
-    loadPosts();
+    fetchPosts();
   }, [navigate]);
 
-  const loadPosts = () => {
-    const storedPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
-    setPosts(storedPosts);
+  const fetchPosts = async () => {
+    try {
+      const response = await api.get('/blog'); // GET /api/blog
+      setPosts(response.data);
+    } catch (error) {
+      console.error('Failed to load blog posts', error);
+      toast.error('Failed to load blog posts');
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (editingPost) {
-      const updatedPosts = posts.map(p => 
-        p.id === editingPost.id ? { ...formData, id: editingPost.id } : p
-      );
-      localStorage.setItem('blogPosts', JSON.stringify(updatedPosts));
-      setPosts(updatedPosts);
-      toast.success('Blog post updated successfully');
-    } else {
-      const newPost = {
-        ...formData,
-        id: Date.now().toString()
-      };
-      const updatedPosts = [newPost, ...posts];
-      localStorage.setItem('blogPosts', JSON.stringify(updatedPosts));
-      setPosts(updatedPosts);
-      toast.success('Blog post created successfully');
-    }
 
-    setShowForm(false);
-    setEditingPost(null);
-    setFormData({
-      title: '',
-      excerpt: '',
-      content: '',
-      imageUrl: '',
-      publishDate: new Date().toISOString().split('T')[0]
-    });
+    try {
+      if (editingPost) {
+        await api.put(`/blog/${editingPost.id}`, formData); // PUT /api/blog/:id
+        toast.success('Blog post updated successfully');
+      } else {
+        await api.post('/blog', formData); // POST /api/blog
+        toast.success('Blog post created successfully');
+      }
+
+      fetchPosts();
+      setShowForm(false);
+      setEditingPost(null);
+      setFormData({
+        title: '',
+        excerpt: '',
+        content: '',
+        imageUrl: '',
+        publishDate: new Date().toISOString().split('T')[0],
+      });
+    } catch (error) {
+      console.error('Blog save failed', error);
+      toast.error('Failed to save blog post');
+    }
   };
 
   const handleEdit = (post) => {
@@ -71,17 +73,21 @@ const AdminBlog = () => {
       excerpt: post.excerpt,
       content: post.content,
       imageUrl: post.imageUrl,
-      publishDate: post.publishDate
+      publishDate: post.publishDate,
     });
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
-      const updatedPosts = posts.filter(p => p.id !== id);
-      localStorage.setItem('blogPosts', JSON.stringify(updatedPosts));
-      setPosts(updatedPosts);
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+
+    try {
+      await api.delete(`/blog/${id}`); // DELETE /api/blog/:id
       toast.success('Blog post deleted');
+      fetchPosts();
+    } catch (error) {
+      console.error('Failed to delete blog post', error);
+      toast.error('Failed to delete blog post');
     }
   };
 
@@ -93,33 +99,31 @@ const AdminBlog = () => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
   return (
     <div className="min-h-screen bg-background" data-testid="admin-blog-page">
       <div className="bg-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
-                <ArrowLeft size={24} />
-              </Link>
-              <div className="flex items-center space-x-3">
-                <FileText size={32} />
-                <h1 className="font-serif text-2xl font-bold">Manage Blog</h1>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
+              <ArrowLeft size={24} />
+            </Link>
+            <div className="flex items-center space-x-3">
+              <FileText size={32} />
+              <h1 className="font-serif text-2xl font-bold">Manage Blog</h1>
             </div>
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="flex items-center space-x-2 bg-secondary text-primary hover:bg-secondary/90 px-4 py-2 rounded-full transition-colors"
-              data-testid="add-blog-btn"
-            >
-              <Plus size={20} />
-              <span>New Post</span>
-            </button>
           </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center space-x-2 bg-secondary text-primary hover:bg-secondary/90 px-4 py-2 rounded-full transition-colors"
+            data-testid="add-blog-btn"
+          >
+            <Plus size={20} />
+            <span>New Post</span>
+          </button>
         </div>
       </div>
 
@@ -130,79 +134,32 @@ const AdminBlog = () => {
               {editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  required
-                  value={formData.title}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="blog-title-input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Excerpt *
-                </label>
-                <textarea
-                  name="excerpt"
-                  required
-                  rows="2"
-                  value={formData.excerpt}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="blog-excerpt-input"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Content *
-                </label>
-                <textarea
-                  name="content"
-                  required
-                  rows="10"
-                  value={formData.content}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="blog-content-input"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Image URL
-                </label>
-                <input
-                  type="url"
-                  name="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="blog-image-input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Publish Date *
-                </label>
-                <input
-                  type="date"
-                  name="publishDate"
-                  required
-                  value={formData.publishDate}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="blog-date-input"
-                />
-              </div>
+              {['title', 'excerpt', 'content', 'imageUrl', 'publishDate'].map((field) => (
+                <div key={field}>
+                  <label className="block text-sm font-medium text-primary mb-2">{field === 'imageUrl' ? 'Image URL' : field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                  {field === 'excerpt' || field === 'content' ? (
+                    <textarea
+                      name={field}
+                      required={field !== 'imageUrl'}
+                      rows={field === 'excerpt' ? 2 : 10}
+                      value={formData[field]}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
+                      data-testid={`blog-${field}-input`}
+                    />
+                  ) : (
+                    <input
+                      type={field === 'publishDate' ? 'date' : 'text'}
+                      name={field}
+                      required={field !== 'imageUrl'}
+                      value={formData[field]}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
+                      data-testid={`blog-${field}-input`}
+                    />
+                  )}
+                </div>
+              ))}
 
               <div className="flex space-x-4">
                 <button
@@ -222,7 +179,7 @@ const AdminBlog = () => {
                       excerpt: '',
                       content: '',
                       imageUrl: '',
-                      publishDate: new Date().toISOString().split('T')[0]
+                      publishDate: new Date().toISOString().split('T')[0],
                     });
                   }}
                   className="border border-gray-300 text-muted-foreground hover:bg-gray-50 rounded-full px-8 py-3 font-medium transition-colors"
@@ -249,13 +206,9 @@ const AdminBlog = () => {
                 data-testid={`blog-post-${post.id}`}
               >
                 <div className="flex-1">
-                  <h3 className="font-serif text-2xl font-semibold text-primary mb-2">
-                    {post.title}
-                  </h3>
+                  <h3 className="font-serif text-2xl font-semibold text-primary mb-2">{post.title}</h3>
                   <p className="text-muted-foreground mb-2">{post.excerpt}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Published: {formatDate(post.publishDate)}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Published: {formatDate(post.publishDate)}</p>
                 </div>
                 <div className="flex space-x-2 ml-4">
                   <button
