@@ -1,20 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import api from '../services/api';
 
 const Blog = () => {
   const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const storedPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
-    setPosts(storedPosts);
+    api
+      .get('/blog')
+      .then(data => {
+        setPosts(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load blog posts.');
+        setLoading(false);
+      });
   }, []);
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -31,13 +44,31 @@ const Blog = () => {
             </p>
           </div>
 
-          {posts.length === 0 ? (
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-20">
+              <p className="text-xl text-muted-foreground">Loading blog posts…</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="text-center py-20 text-red-500">
+              {error}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && posts.length === 0 && (
             <div className="text-center py-20" data-testid="blog-empty-state">
               <p className="text-xl text-muted-foreground mb-8">
                 No blog posts yet. Check back soon for updates!
               </p>
             </div>
-          ) : (
+          )}
+
+          {/* Blog Posts */}
+          {!loading && !error && posts.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {posts.map((post) => (
                 <article
@@ -46,10 +77,12 @@ const Blog = () => {
                   data-testid={`blog-post-${post.id}`}
                 >
                   {post.imageUrl && (
-                    <div className="h-48 bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
+                    <div
+                      className="h-48 bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
                       style={{ backgroundImage: `url(${post.imageUrl})` }}
-                    ></div>
+                    />
                   )}
+
                   <div className="p-6">
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-4">
                       <div className="flex items-center">
@@ -58,15 +91,18 @@ const Blog = () => {
                       </div>
                       <div className="flex items-center">
                         <Clock size={16} className="mr-2" />
-                        5 min read
+                        {post.readTime || '5 min read'}
                       </div>
                     </div>
+
                     <h2 className="font-serif text-2xl font-semibold text-primary mb-3 group-hover:text-primary/80 transition-colors">
                       {post.title}
                     </h2>
+
                     <p className="text-muted-foreground mb-4 line-clamp-3">
                       {post.excerpt}
                     </p>
+
                     <Link
                       to={`/blog/${post.id}`}
                       className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
