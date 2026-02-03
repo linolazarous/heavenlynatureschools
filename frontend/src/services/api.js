@@ -1,8 +1,11 @@
+// frontend/src/services/api.js
 import axios from "axios";
 
-// Base API URL (Render backend)
+// Determine base URL: prioritize env var, fallback to production Render URL
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "https://assesslyplatform-pfm1.onrender.com/api";
+  import.meta.env.VITE_API_URL ||          // Vite (recommended 2026)
+  process.env.REACT_APP_API_URL ||         // CRA fallback
+  "https://heavenlynatureschools-qpvf.onrender.com/api";  // your actual backend
 
 // Create axios instance
 const api = axios.create({
@@ -10,6 +13,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 30000,  // optional: prevent hanging requests (30s)
 });
 
 // ==============================
@@ -17,24 +21,24 @@ const api = axios.create({
 // ==============================
 api.interceptors.request.use(
   (config) => {
-    // Add JWT token if exists (for admin protected routes)
     const token = localStorage.getItem("access_token");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    console.log(
-      `[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`,
-      config.data || ""
-    );
+    // Optional: only log in development
+    if (import.meta.env.DEV || process.env.NODE_ENV === "development") {
+      console.log(
+        `[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`,
+        // Avoid logging full body if sensitive (e.g. passwords)
+        config.data && !config.url.includes("/login") ? config.data : "[hidden]"
+      );
+    }
 
     return config;
   },
-  (error) => {
-    console.error("[API REQUEST ERROR]", error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // ==============================
@@ -42,28 +46,42 @@ api.interceptors.request.use(
 // ==============================
 api.interceptors.response.use(
   (response) => {
-    console.log(
-      `[API RESPONSE] ${response.config.url}`,
-      response.status,
-      response.data || ""
-    );
+    // Optional dev logging
+    if (import.meta.env.DEV || process.env.NODE_ENV === "development") {
+      console.log(
+        `[API RESPONSE] ${response.config.url}`,
+        response.status,
+        response.data
+      );
+    }
     return response;
   },
   (error) => {
     if (error.response) {
-      console.error(
-        "[API RESPONSE ERROR]",
-        error.response.status,
-        error.response.data
-      );
+      const { status, data } = error.response;
 
-      // Auto logout & redirect on 401 Unauthorized
-      if (error.response.status === 401) {
+      console.error("[API ERROR]", status, data);
+
+      // Handle 401 Unauthorized → clear token & redirect (admin-specific)
+      if (status === 401) {
         localStorage.removeItem("access_token");
+        // If using react-router v6+, prefer: navigate("/admin/login")
+        // For now, window.location is simple and works
         window.location.href = "/admin/login";
       }
-    } else {
+
+      // Optional: handle other common statuses
+      if (status === 403) {
+        // Forbidden – maybe show "Access denied" toast
+      }
+      if (status >= 500) {
+        // Server error – notify user "Something went wrong, try later"
+      }
+    } else if (error.request) {
       console.error("[API NETWORK ERROR]", error.message);
+      // e.g., no internet, timeout → show offline toast
+    } else {
+      console.error("[API SETUP ERROR]", error.message);
     }
 
     return Promise.reject(error);
