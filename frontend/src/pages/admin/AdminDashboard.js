@@ -1,44 +1,46 @@
+// frontend/src/pages/admin/AdminDashboard.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, Mail, FileText, Calendar, LogOut } from 'lucide-react';
+import { LayoutDashboard, Mail, FileText, Calendar, LogOut, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '../../services/api';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
   const [stats, setStats] = useState({ contacts: 0, blogPosts: 0, events: 0 });
-
-  const loadStats = () => {
-    const contacts = JSON.parse(localStorage.getItem('contacts') || '[]');
-    const blogPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
-    const events = JSON.parse(localStorage.getItem('schoolEvents') || '[]');
-    setStats({ contacts: contacts.length, blogPosts: blogPosts.length, events: events.length });
-  };
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (window.netlifyIdentity) {
-      const currentUser = window.netlifyIdentity.currentUser();
-      if (!currentUser) {
-        navigate('/admin/login');
-      } else {
-        setUser(currentUser);
+    const fetchStats = async () => {
+      try {
+        const res = await api.get('/stats');
+        setStats(res.data);
+      } catch (err) {
+        toast.error('Failed to load stats');
+        if (err.response?.status === 401) {
+          localStorage.removeItem('access_token');
+          navigate('/admin/login');
+        }
+      } finally {
+        setLoading(false);
       }
-      window.netlifyIdentity.on('logout', () => navigate('/admin/login'));
-    }
-
-    loadStats();
-    const onStorageChange = () => loadStats();
-    window.addEventListener('storage', onStorageChange);
-    return () => window.removeEventListener('storage', onStorageChange);
+    };
+    fetchStats();
   }, [navigate]);
 
   const handleLogout = () => {
-    if (window.netlifyIdentity) {
-      window.netlifyIdentity.logout();
-      toast.success('Logged out successfully');
-      navigate('/admin/login');
-    }
+    localStorage.removeItem('access_token');
+    toast.success('Logged out');
+    navigate('/admin/login');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" data-testid="admin-dashboard-page">
@@ -48,13 +50,12 @@ const AdminDashboard = () => {
             <LayoutDashboard size={32} />
             <div>
               <h1 className="font-serif text-2xl font-bold">Admin Dashboard</h1>
-              {user && <p className="text-sm text-white/80">Welcome, {user?.email || 'Admin'}</p>}
+              <p className="text-sm text-white/80">Welcome back</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
             className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-colors"
-            data-testid="admin-logout-btn"
           >
             <LogOut size={20} />
             <span>Logout</span>
@@ -89,7 +90,7 @@ const StatCard = ({ icon, value, label }) => (
 
 const AdminNavCard = ({ to, icon, title, desc }) => (
   <Link to={to} className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 group">
-    {React.cloneElement(icon, { className: icon.props.className + ' group-hover:scale-110 transition-transform' })}
+    {React.cloneElement(icon, { className: `${icon.props.className} group-hover:scale-110 transition-transform` })}
     <h3 className="font-serif text-2xl font-semibold text-primary mb-2">{title}</h3>
     <p className="text-muted-foreground">{desc}</p>
   </Link>
