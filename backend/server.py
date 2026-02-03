@@ -49,7 +49,7 @@ api_router = APIRouter(prefix="/api")
 # CORS Middleware
 # ==============================
 cors_origins = [
-    "https://heavenlynatureschools.netlify.app",
+    "https://heavenlynatureschool.netlify.app",
     "https://heavenlynatureschools.com",
     "https://www.heavenlynatureschools.com",
     "http://localhost:3000",
