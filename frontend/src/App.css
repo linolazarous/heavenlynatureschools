@@ -3,7 +3,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Remove default button styles */
+/* Reset button defaults */
 button {
   border: none;
   background: none;
@@ -11,22 +11,25 @@ button {
   cursor: pointer;
 }
 
-/* Smooth transitions for interactive elements */
-a, button {
+/* Smooth hover transitions */
+a,
+button {
   transition: opacity 0.2s ease;
 }
 
-a:hover, button:hover {
+a:hover,
+button:hover {
   opacity: 0.9;
 }
 
-/* Image optimization */
+/* Responsive images */
 img {
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
-/* Focus visible for accessibility */
+/* Accessibility focus styles */
 *:focus-visible {
   outline: 2px solid hsl(var(--secondary));
   outline-offset: 2px;
