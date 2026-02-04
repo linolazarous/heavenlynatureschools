@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#001F5B" />
     <meta
@@ -10,27 +10,16 @@
       content="Heavenly Nature Nursery & Primary School - Nurturing Right Leaders. A faith-based educational institution providing free education to street children, abandoned children, and orphans in Juba City, South Sudan."
     />
     <meta name="keywords" content="school, education, faith-based, South Sudan, Juba, non-profit, Christian school, orphans, street children" />
-    <meta property="og:title" content="Heavenly Nature Nursery & Primary School" />
+    <meta property="og:title" content="Heavenly Nature Schools - Nurturing Right Leaders" />
     <meta property="og:description" content="Nurturing Right Leaders - Providing hope and education to children in need" />
     <meta property="og:type" content="website" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="manifest" href="/manifest.json" />
     <title>Heavenly Nature Schools - Nurturing Right Leaders</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <script>
-      if (window.netlifyIdentity) {
-        window.netlifyIdentity.on("init", user => {
-          if (!user) {
-            window.netlifyIdentity.on("login", () => {
-              document.location.href = "/admin";
-            });
-          }
-        });
-      }
-    </script>
+    <!-- Removed Netlify Identity script completely -->
   </body>
 </html>
