@@ -14,7 +14,7 @@ python-jose>=3.5.0    # bumped from 3.3.0
 pyjwt>=2.11.0         # from log/install
 bcrypt==4.1.3         # current
 passlib>=1.7.4
-cryptography==46.0.4  # latest stable as of early 2026
+cryptography==46.0.5  # latest stable as of early 2026
 email-validator>=2.3.0
 
 # AWS SDK (if using S3 or other AWS services)
