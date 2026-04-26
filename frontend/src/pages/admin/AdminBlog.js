@@ -1,56 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Edit, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '../../utils/api';
 
-// ─── Form sub-component ───────────────────────────────────────────────────────
-
+// ─── Form ─────────────────────────────────────────────────────
 const BlogPostForm = ({ formData, editingPost, onChange, onSubmit, onCancel }) => (
-  <div className="bg-white rounded-2xl p-8 shadow-lg mb-8" data-testid="blog-form">
+  <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
     <h2 className="font-serif text-2xl font-semibold text-primary mb-6">
       {editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}
     </h2>
+
     <form onSubmit={onSubmit} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-primary mb-2">Title *</label>
-        <input type="text" name="title" required value={formData.title} onChange={onChange}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-          data-testid="blog-title-input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-primary mb-2">Excerpt *</label>
-        <textarea name="excerpt" required rows="2" value={formData.excerpt} onChange={onChange}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-          data-testid="blog-excerpt-input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-primary mb-2">Content *</label>
-        <textarea name="content" required rows="10" value={formData.content} onChange={onChange}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-          data-testid="blog-content-input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-primary mb-2">Image URL</label>
-        <input type="url" name="imageUrl" value={formData.imageUrl} onChange={onChange}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-          data-testid="blog-image-input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-primary mb-2">Publish Date *</label>
-        <input type="date" name="publishDate" required value={formData.publishDate} onChange={onChange}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-          data-testid="blog-date-input" />
-      </div>
-      <div className="flex space-x-4">
-        <button type="submit"
-          className="bg-primary text-white hover:bg-primary/90 rounded-full px-8 py-3 font-medium transition-colors"
-          data-testid="blog-submit-btn">
-          {editingPost ? 'Update Post' : 'Create Post'}
+      <input name="title" value={formData.title} onChange={onChange} required placeholder="Title"
+        className="w-full px-4 py-3 border rounded-lg" />
+
+      <textarea name="excerpt" value={formData.excerpt} onChange={onChange} required placeholder="Excerpt"
+        className="w-full px-4 py-3 border rounded-lg" />
+
+      <textarea name="content" value={formData.content} onChange={onChange} required rows="8"
+        placeholder="Content"
+        className="w-full px-4 py-3 border rounded-lg" />
+
+      <input name="imageUrl" value={formData.imageUrl} onChange={onChange}
+        placeholder="Image URL"
+        className="w-full px-4 py-3 border rounded-lg" />
+
+      <input type="date" name="publishDate" value={formData.publishDate} onChange={onChange} required
+        className="w-full px-4 py-3 border rounded-lg" />
+
+      <div className="flex gap-4">
+        <button className="bg-primary text-white px-6 py-2 rounded-full">
+          {editingPost ? 'Update' : 'Create'}
         </button>
-        <button type="button" onClick={onCancel}
-          className="border border-gray-300 text-muted-foreground hover:bg-gray-50 rounded-full px-8 py-3 font-medium transition-colors"
-          data-testid="blog-cancel-btn">
+
+        <button type="button" onClick={onCancel} className="border px-6 py-2 rounded-full">
           Cancel
         </button>
       </div>
@@ -58,129 +42,123 @@ const BlogPostForm = ({ formData, editingPost, onChange, onSubmit, onCancel }) =
   </div>
 );
 
-// ─── Post list item ───────────────────────────────────────────────────────────
-
-const PostListItem = ({ post, onEdit, onDelete, formatDate }) => (
-  <div className="bg-white rounded-2xl p-6 shadow-lg flex justify-between items-start"
-    data-testid={`blog-post-${post.id}`}>
-    <div className="flex-1">
-      <h3 className="font-serif text-2xl font-semibold text-primary mb-2">{post.title}</h3>
-      <p className="text-muted-foreground mb-2">{post.excerpt}</p>
-      <p className="text-sm text-muted-foreground">Published: {formatDate(post.publishDate)}</p>
-    </div>
-    <div className="flex space-x-2 ml-4">
-      <button onClick={() => onEdit(post)}
-        className="text-primary hover:bg-primary/10 p-2 rounded-lg transition-colors"
-        data-testid={`edit-blog-${post.id}`}>
-        <Edit size={20} />
-      </button>
-      <button onClick={() => onDelete(post.id)}
-        className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors"
-        data-testid={`delete-blog-${post.id}`}>
-        <Trash2 size={20} />
-      </button>
-    </div>
-  </div>
-);
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-const emptyForm = {
-  title: '',
-  excerpt: '',
-  content: '',
-  imageUrl: '',
-  publishDate: new Date().toISOString().split('T')[0],
-};
-
+// ─── Main Component ───────────────────────────────────────────
 const AdminBlog = () => {
   const [posts, setPosts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
+
+  const emptyForm = {
+    title: '',
+    excerpt: '',
+    content: '',
+    imageUrl: '',
+    publishDate: new Date().toISOString().split('T')[0],
+  };
+
   const [formData, setFormData] = useState(emptyForm);
 
-  useEffect(() => {
-    apiFetch('/api/blog')
-      .then(data => setPosts(data))
-      .catch(() => toast.error('Failed to load blog posts'));
-    // apiFetch is a stable module import; state setters are stable React references
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ✅ Load posts
+  const loadPosts = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/blog');
+      setPosts(data);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load posts');
+    }
   }, []);
 
-  const resetForm = () => { setShowForm(false); setEditingPost(null); setFormData(emptyForm); };
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
 
+  // ✅ Reset form
+  const resetForm = () => {
+    setFormData(emptyForm);
+    setEditingPost(null);
+    setShowForm(false);
+  };
+
+  // ✅ Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
       if (editingPost) {
-        const updated = await apiFetch(`/api/admin/blog/${editingPost.id}`, {
-          method: 'PUT', body: JSON.stringify(formData),
+        await apiFetch(`/api/admin/blog/${editingPost.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
         });
-        setPosts(prev => prev.map(p => p.id === editingPost.id ? updated : p));
-        toast.success('Blog post updated successfully');
+        toast.success('Post updated');
       } else {
-        const created = await apiFetch('/api/admin/blog', {
-          method: 'POST', body: JSON.stringify(formData),
+        await apiFetch('/api/admin/blog', {
+          method: 'POST',
+          body: JSON.stringify(formData),
         });
-        setPosts(prev => [created, ...prev]);
-        toast.success('Blog post created successfully');
+        toast.success('Post created');
       }
+
+      await loadPosts(); // 🔄 always sync with backend
       resetForm();
     } catch (err) {
-      toast.error(err.message || 'Failed to save post');
+      toast.error(err.message || 'Failed to save');
     }
   };
 
+  // ✅ Edit
   const handleEdit = (post) => {
     setEditingPost(post);
-    setFormData({ title: post.title, excerpt: post.excerpt, content: post.content,
-      imageUrl: post.imageUrl || '', publishDate: post.publishDate });
+    setFormData({
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      imageUrl: post.imageUrl || '',
+      publishDate: post.publishDate,
+    });
     setShowForm(true);
   };
 
+  // ✅ Delete
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    if (!window.confirm('Delete this post?')) return;
+
     try {
       await apiFetch(`/api/admin/blog/${id}`, { method: 'DELETE' });
-      setPosts(prev => prev.filter(p => p.id !== id));
-      toast.success('Blog post deleted');
+      toast.success('Deleted');
+
+      await loadPosts();
     } catch (err) {
-      toast.error(err.message || 'Failed to delete');
+      toast.error(err.message || 'Delete failed');
     }
   };
 
-  const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  // ✅ Change handler
+  const handleChange = (e) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
+  // ✅ Date format
   const formatDate = (d) =>
-    new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    new Date(d).toLocaleDateString();
 
   return (
-    <div className="min-h-screen bg-background" data-testid="admin-blog-page">
-      <div className="bg-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
-                <ArrowLeft size={24} />
-              </Link>
-              <div className="flex items-center space-x-3">
-                <FileText size={32} />
-                <h1 className="font-serif text-2xl font-bold">Manage Blog</h1>
-              </div>
-            </div>
-            <button
-              onClick={() => { setShowForm(!showForm); setEditingPost(null); setFormData(emptyForm); }}
-              className="flex items-center space-x-2 bg-secondary text-primary hover:bg-secondary/90 px-4 py-2 rounded-full transition-colors"
-              data-testid="add-blog-btn"
-            >
-              <Plus size={20} />
-              <span>New Post</span>
-            </button>
-          </div>
+    <div className="min-h-screen bg-background">
+      <div className="bg-primary text-white p-6 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <Link to="/admin"><ArrowLeft /></Link>
+          <h1 className="text-2xl font-bold">Manage Blog</h1>
         </div>
+
+        <button
+          onClick={() => { setShowForm(!showForm); resetForm(); }}
+          className="bg-secondary text-primary px-4 py-2 rounded-full flex items-center gap-2"
+        >
+          <Plus /> New Post
+        </button>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="p-8 max-w-5xl mx-auto">
+
         {showForm && (
           <BlogPostForm
             formData={formData}
@@ -192,23 +170,29 @@ const AdminBlog = () => {
         )}
 
         {posts.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl" data-testid="no-posts">
-            <FileText size={64} className="mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">No blog posts yet</p>
+          <div className="text-center py-20">
+            <FileText size={50} className="mx-auto mb-4" />
+            <p>No posts yet</p>
           </div>
         ) : (
           <div className="space-y-4">
             {posts.map(post => (
-              <PostListItem
-                key={post.id}
-                post={post}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                formatDate={formatDate}
-              />
+              <div key={post.id} className="bg-white p-6 rounded-xl shadow flex justify-between">
+                <div>
+                  <h3 className="text-xl font-bold">{post.title}</h3>
+                  <p>{post.excerpt}</p>
+                  <small>{formatDate(post.publishDate)}</small>
+                </div>
+
+                <div className="flex gap-2">
+                  <button onClick={() => handleEdit(post)}><Edit /></button>
+                  <button onClick={() => handleDelete(post.id)}><Trash2 /></button>
+                </div>
+              </div>
             ))}
           </div>
         )}
+
       </div>
     </div>
   );
