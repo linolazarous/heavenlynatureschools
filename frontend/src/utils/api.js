@@ -146,6 +146,16 @@ export const adminApi = {
   getContacts: () => apiFetch('/api/admin/contacts'),
   getContact: (id) => apiFetch(`/api/admin/contacts/${id}`),
   
+  // Add these to your adminApi object
+deleteContact: (id) => apiFetch(`/api/admin/contacts/${id}`, {
+  method: 'DELETE',
+}),
+
+toggleContactRead: (id, read) => apiFetch(`/api/admin/contacts/${id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ read }),
+}),
+  
   // Blog (Admin)
   createBlog: (blogData) => apiFetch('/api/admin/blog', {
     method: 'POST',
