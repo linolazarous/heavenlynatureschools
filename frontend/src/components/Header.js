@@ -1,7 +1,7 @@
 // frontend/src/components/Header.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, School, BookOpen, Calendar, Home, Info, Target, Briefcase, Mail, Heart } from 'lucide-react';
+import { Menu, X, BookOpen, Calendar, Home, Info, Target, Briefcase, Mail, Heart } from 'lucide-react';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -52,9 +52,11 @@ const Header = () => {
             className="flex items-center space-x-3 group" 
             data-testid="logo-link"
           >
-            <div className="bg-gradient-to-br from-primary to-secondary rounded-full p-2 shadow-md group-hover:scale-105 transition-transform duration-300">
-              <School size={32} className="text-white" />
-            </div>
+            <img 
+              src="/logo.webp" 
+              alt="Heavenly Nature Schools Logo" 
+              className="h-14 w-14 object-contain rounded-full shadow-md group-hover:scale-105 transition-transform duration-300"
+            />
             <div>
               <h1 className="font-serif text-lg md:text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent leading-tight">
                 HEAVENLY NATURE SCHOOLS
