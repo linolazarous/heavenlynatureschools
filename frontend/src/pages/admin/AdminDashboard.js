@@ -2,34 +2,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Mail, 
   FileText, 
   Calendar, 
-  LogOut, 
   Users, 
   Eye, 
   TrendingUp,
   Bell,
   RefreshCw,
   Settings,
-  Shield,
-  Globe,
-  Moon,
-  Sun,
-  BellOff,
-  Save,
-  X,
-  UserCog,
-  Lock,
-  Palette
+  School,
+  MessageCircle,
+  Star
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { adminApi, publicApi, apiFetch } from '../../utils/api';
 
 const AdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState({ 
     contacts: 0, 
     unreadContacts: 0, 
@@ -45,31 +36,20 @@ const AdminDashboard = () => {
   
   // Settings state
   const [settings, setSettings] = useState({
-    // Theme
     darkMode: localStorage.getItem('theme') === 'dark',
-    
-    // Notifications
     emailNotifications: true,
     pushNotifications: false,
     notifyNewContacts: true,
     notifyNewBlogPosts: false,
-    
-    // Display
     itemsPerPage: 10,
     dateFormat: 'MM/DD/YYYY',
-    
-    // Security
-    sessionTimeout: 30, // minutes
+    sessionTimeout: 30,
     twoFactorAuth: false,
-    
-    // Site Settings
     siteName: 'Heavenly Nature Schools',
     siteEmail: 'info@heavenlynature.com',
-    contactPhone: '+1 234 567 8900',
-    contactAddress: '123 School Street, City, State 12345',
-    
-    // Social Media
-    facebook: '',
+    contactPhone: '+211 922 273 334',
+    contactAddress: 'Juba City, Central Equatoria State, South Sudan',
+    facebook: 'https://www.facebook.com/share/1CPEyYC14f/',
     twitter: '',
     instagram: '',
     linkedin: ''
@@ -111,16 +91,13 @@ const AdminDashboard = () => {
     }
   }, []);
 
-  // ✅ Load saved settings from localStorage/backend
+  // ✅ Load saved settings
   const loadSettings = useCallback(async () => {
     try {
-      // Try to load from backend first
       const savedSettings = await apiFetch('/api/admin/settings').catch(() => null);
       if (savedSettings) {
         setSettings(prev => ({ ...prev, ...savedSettings }));
       }
-      
-      // Load theme from localStorage
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme === 'dark') {
         document.documentElement.classList.add('dark');
@@ -133,7 +110,6 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchStats();
     loadSettings();
-    
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, [fetchStats, loadSettings]);
@@ -142,7 +118,6 @@ const AdminDashboard = () => {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      // Save theme
       if (settings.darkMode) {
         document.documentElement.classList.add('dark');
         localStorage.setItem('theme', 'dark');
@@ -151,12 +126,10 @@ const AdminDashboard = () => {
         localStorage.setItem('theme', 'light');
       }
       
-      // Save to backend
       await apiFetch('/api/admin/settings', {
         method: 'POST',
         body: JSON.stringify(settings)
       }).catch(() => {
-        // If backend endpoint doesn't exist, save to localStorage
         localStorage.setItem('admin_settings', JSON.stringify(settings));
       });
       
@@ -170,22 +143,34 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success('Logged out successfully 👋');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Failed to logout');
-    }
-  };
-
   const handleRefresh = () => {
     fetchStats();
     toast.info('Refreshing dashboard data...');
   };
 
-  // Settings Modal Component
+  // Format date helper
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Get relative time
+  const getRelativeTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
+
+  // Settings Modal
   const SettingsModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -194,203 +179,49 @@ const AdminDashboard = () => {
             <Settings size={24} className="text-primary" />
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Dashboard Settings</h2>
           </div>
-          <button
-            onClick={() => setShowSettings(false)}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
-          >
-            <X size={20} />
+          <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-
-        <div className="p-6 space-y-6">
-          {/* Appearance Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-              <Palette size={20} /> Appearance
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-6">
+          <div className="space-y-6">
+            {/* Appearance */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Appearance</h3>
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">Dark Mode</span>
+                <span>Dark Mode</span>
                 <button
                   onClick={() => setSettings(prev => ({ ...prev, darkMode: !prev.darkMode }))}
-                  className={`px-4 py-2 rounded-lg transition ${settings.darkMode ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  className={`px-4 py-2 rounded-lg transition ${settings.darkMode ? 'bg-gray-800 text-white' : 'bg-gray-200'}`}
                 >
-                  {settings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                  {settings.darkMode ? '🌙' : '☀️'}
                 </button>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Items Per Page
+            </div>
+
+            {/* Notifications */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Notifications</h3>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span>Email Notifications</span>
+                  <input type="checkbox" checked={settings.emailNotifications} onChange={(e) => setSettings(prev => ({ ...prev, emailNotifications: e.target.checked }))} className="w-5 h-5" />
                 </label>
-                <select
-                  value={settings.itemsPerPage}
-                  onChange={(e) => setSettings(prev => ({ ...prev, itemsPerPage: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Format
+                <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span>New Contact Alerts</span>
+                  <input type="checkbox" checked={settings.notifyNewContacts} onChange={(e) => setSettings(prev => ({ ...prev, notifyNewContacts: e.target.checked }))} className="w-5 h-5" />
                 </label>
-                <select
-                  value={settings.dateFormat}
-                  onChange={(e) => setSettings(prev => ({ ...prev, dateFormat: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
               </div>
             </div>
           </div>
 
-          {/* Notification Settings */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-              <Bell size={20} /> Notifications
-            </h3>
-            <div className="space-y-3">
-              <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">Email Notifications</span>
-                <input
-                  type="checkbox"
-                  checked={settings.emailNotifications}
-                  onChange={(e) => setSettings(prev => ({ ...prev, emailNotifications: e.target.checked }))}
-                  className="w-5 h-5 text-primary rounded"
-                />
-              </label>
-              
-              <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">Push Notifications</span>
-                <input
-                  type="checkbox"
-                  checked={settings.pushNotifications}
-                  onChange={(e) => setSettings(prev => ({ ...prev, pushNotifications: e.target.checked }))}
-                  className="w-5 h-5 text-primary rounded"
-                />
-              </label>
-              
-              <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">Notify on New Contact Messages</span>
-                <input
-                  type="checkbox"
-                  checked={settings.notifyNewContacts}
-                  onChange={(e) => setSettings(prev => ({ ...prev, notifyNewContacts: e.target.checked }))}
-                  className="w-5 h-5 text-primary rounded"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Site Information */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-              <Globe size={20} /> Site Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Site Name
-                </label>
-                <input
-                  type="text"
-                  value={settings.siteName}
-                  onChange={(e) => setSettings(prev => ({ ...prev, siteName: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Site Email
-                </label>
-                <input
-                  type="email"
-                  value={settings.siteEmail}
-                  onChange={(e) => setSettings(prev => ({ ...prev, siteEmail: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Contact Phone
-                </label>
-                <input
-                  type="text"
-                  value={settings.contactPhone}
-                  onChange={(e) => setSettings(prev => ({ ...prev, contactPhone: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Contact Address
-                </label>
-                <input
-                  type="text"
-                  value={settings.contactAddress}
-                  onChange={(e) => setSettings(prev => ({ ...prev, contactAddress: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Security Settings */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-              <Shield size={20} /> Security
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Session Timeout (minutes)
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="120"
-                  value={settings.sessionTimeout}
-                  onChange={(e) => setSettings(prev => ({ ...prev, sessionTimeout: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              
-              <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">Two-Factor Authentication</span>
-                <input
-                  type="checkbox"
-                  checked={settings.twoFactorAuth}
-                  onChange={(e) => setSettings(prev => ({ ...prev, twoFactorAuth: e.target.checked }))}
-                  className="w-5 h-5 text-primary rounded"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="flex gap-3 pt-4 border-t">
-            <button
-              onClick={handleSaveSettings}
-              disabled={savingSettings}
-              className="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition disabled:opacity-50"
-            >
+          <div className="flex gap-3 mt-6 pt-4 border-t">
+            <button onClick={handleSaveSettings} disabled={savingSettings} className="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition disabled:opacity-50">
               {savingSettings ? 'Saving...' : 'Save Settings'}
             </button>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="px-6 py-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-            >
+            <button onClick={() => setShowSettings(false)} className="px-6 py-3 border rounded-lg hover:bg-gray-50 transition">
               Cancel
             </button>
           </div>
@@ -401,88 +232,138 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white/20 p-3 rounded-xl">
-                <LayoutDashboard size={28} />
-              </div>
-              <div>
-                <h1 className="font-serif text-2xl font-bold">{settings.siteName}</h1>
-                {user && (
-                  <p className="text-sm text-white/80">
-                    Welcome back, {user.name || user.email?.split('@')[0] || 'Admin'}
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="text-xs text-white/70 hidden sm:block">
-                Last updated: {lastUpdated.toLocaleTimeString()}
-              </div>
-              
-              <button
-                onClick={() => setShowSettings(true)}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-colors"
-                title="Settings"
-              >
-                <Settings size={18} />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
-              
-              <button
-                onClick={handleRefresh}
-                disabled={loading}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-              
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors"
-              >
-                <LogOut size={18} />
-                <span>Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Rest of your dashboard content (stats, navigation cards, etc.) */}
+      {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Welcome back, {user?.name || user?.email?.split('@')[0] || 'Admin'}! 👋</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Here's what's happening with your school today.</p>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* ... keep existing stat cards ... */}
-        </div>
-
-        {/* Navigation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* ... keep existing navigation cards ... */}
-        </div>
-
-        {/* Add Settings Link Card */}
-        <div className="mt-6">
-          <button
-            onClick={() => setShowSettings(true)}
-            className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                <Settings size={24} className="text-gray-600 dark:text-gray-300" />
+          {/* Contacts Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-xl">
+                <Mail size={24} className="text-blue-600 dark:text-blue-400" />
               </div>
-              <div>
-                <h3 className="font-semibold text-lg text-gray-800 dark:text-white">Dashboard Settings</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
-                  Configure appearance, notifications, site information, and security
-                </p>
-              </div>
+              {stats.unreadContacts > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                  {stats.unreadContacts} new
+                </span>
+              )}
             </div>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.contacts}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Messages</p>
+            {stats.unreadContacts > 0 && (
+              <p className="text-primary text-xs mt-2">{stats.unreadContacts} unread</p>
+            )}
+          </div>
+
+          {/* Blog Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-xl mb-3">
+              <FileText size={24} className="text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.blogPosts}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Blog Posts</p>
+          </div>
+
+          {/* Events Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-xl mb-3">
+              <Calendar size={24} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.events}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Events</p>
+            {stats.upcomingEvents > 0 && (
+              <p className="text-purple-600 text-xs mt-2">{stats.upcomingEvents} upcoming</p>
+            )}
+          </div>
+
+          {/* Total Content Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+            <div className="bg-orange-100 dark:bg-orange-900/30 p-3 rounded-xl mb-3">
+              <TrendingUp size={24} className="text-orange-600 dark:text-orange-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.contacts + stats.blogPosts + stats.events}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Content</p>
+          </div>
+        </div>
+
+        {/* Recent Unread Messages */}
+        {stats.recentContacts.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Bell size={20} className="text-primary" />
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Recent Unread Messages</h2>
+              </div>
+              <Link to="/admin/contacts" className="text-primary text-sm hover:underline flex items-center gap-1">
+                View all <Eye size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {stats.recentContacts.map((contact, index) => (
+                <div key={contact._id || contact.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-800 dark:text-white">{contact.name}</p>
+                      <span className="text-xs text-gray-400">{contact.email}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">{contact.subject}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">{getRelativeTime(contact.createdAt || contact.date)}</p>
+                    <Link to="/admin/contacts" className="text-primary text-xs hover:underline">View</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Actions Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link to="/admin/blog" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
+            <div className="bg-green-100 dark:bg-green-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+              <FileText size={32} className="text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Manage Blog</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Create and edit posts</p>
+          </Link>
+
+          <Link to="/admin/events" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
+            <div className="bg-purple-100 dark:bg-purple-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+              <Calendar size={32} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Manage Events</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Schedule and manage events</p>
+          </Link>
+
+          <Link to="/admin/contacts" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
+            <div className="bg-blue-100 dark:bg-blue-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+              <Mail size={32} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="font-semibold text-gray-800 dark:text-white mb-2">View Contacts</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Read and respond to messages</p>
+          </Link>
+
+          <button onClick={() => setShowSettings(true)} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
+            <div className="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+              <Settings size={32} className="text-gray-600 dark:text-gray-400" />
+            </div>
+            <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Settings</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Configure your dashboard</p>
+          </button>
+        </div>
+
+        {/* Last Updated */}
+        <div className="mt-8 text-center text-xs text-gray-400">
+          Last updated: {lastUpdated.toLocaleTimeString()}
+          <button onClick={handleRefresh} className="ml-2 text-primary hover:underline">
+            Refresh
           </button>
         </div>
       </div>
