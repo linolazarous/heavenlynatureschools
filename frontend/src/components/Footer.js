@@ -1,7 +1,7 @@
 // frontend/src/components/Footer.js
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Youtube, Phone, Mail, MapPin, Heart, School, Instagram, Twitter, Send } from 'lucide-react';
+import { Facebook, Youtube, Phone, Mail, MapPin, Heart, Send, Instagram, Twitter } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -14,9 +14,11 @@ const Footer = () => {
           {/* About Section */}
           <div>
             <div className="flex items-center space-x-3 mb-4">
-              <div className="bg-white/20 p-2 rounded-xl">
-                <School size={32} className="text-white" />
-              </div>
+              <img 
+                src="/logo.webp" 
+                alt="Heavenly Nature Schools Logo" 
+                className="h-14 w-14 object-contain bg-white/10 rounded-xl p-2"
+              />
               <h3 className="font-serif text-xl font-bold">HEAVENLY NATURE SCHOOLS</h3>
             </div>
             <p className="text-white/80 italic mb-3">"Nurturing Right Leaders"</p>
@@ -208,8 +210,7 @@ const Footer = () => {
               onSubmit={(e) => {
                 e.preventDefault();
                 const email = e.target.querySelector('input[type="email"]').value;
-                // Handle newsletter subscription
-                alert(`Thank you for subscribing! We'll send updates to ${email}`);
+                toast.success(`Thank you for subscribing! We'll send updates to ${email}`);
                 e.target.reset();
               }}
               className="flex flex-col sm:flex-row gap-2"
