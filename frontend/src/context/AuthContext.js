@@ -1,6 +1,5 @@
 // frontend/src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { adminApi } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -158,7 +157,7 @@ export const AuthProvider = ({ children }) => {
   }, [checkAuth]);
 
   // 🔐 LOGIN
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       // Use the existing login endpoint
       const response = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -198,10 +197,10 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       throw error;
     }
-  };
+  }, []); // No dependencies needed as it only uses BASE_URL which is constant
 
   // 🔓 LOGOUT
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       // Optional: Call logout endpoint if exists
       const token = getAccessToken();
@@ -223,14 +222,16 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       window.location.href = '/admin/login';
     }
-  };
+  }, []); // No dependencies needed
 
   // ✅ Update user profile (if needed)
-  const updateUser = (updates) => {
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-  };
+  const updateUser = useCallback((updates) => {
+    setUser(prevUser => {
+      const updatedUser = { ...prevUser, ...updates };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+  }, []); // No dependencies needed
 
   const value = useMemo(
     () => ({
@@ -244,7 +245,7 @@ export const AuthProvider = ({ children }) => {
       getAccessToken,
       refreshToken,
     }),
-    [user, isLoading, isAuthenticated]
+    [user, isLoading, isAuthenticated, login, logout, updateUser] // Added missing dependencies
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -263,7 +264,7 @@ export const useAuth = () => {
 
 // ✅ Role-based access hook
 export const useRequireAuth = () => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -271,7 +272,7 @@ export const useRequireAuth = () => {
     }
   }, [isAuthenticated, isLoading]);
 
-  return { isAuthenticated, isLoading, user };
+  return { isAuthenticated, isLoading };
 };
 
 // ✅ Admin check hook
