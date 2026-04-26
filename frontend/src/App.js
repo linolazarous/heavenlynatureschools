@@ -1,3 +1,4 @@
+// frontend/src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
@@ -21,6 +22,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
+import AdminLayout from './layouts/AdminLayout'; // Import AdminLayout
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -42,34 +44,48 @@ function App() {
     <HelmetProvider>
       <AuthProvider>
         <Router>
-        <div className="App">
-          <Header />
-          <main>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/vision" element={<Vision />} />
-              <Route path="/programs" element={<Programs />} />
-              <Route path="/governance" element={<Governance />} />
-              <Route path="/partnerships" element={<Partnerships />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/blog/:id" element={<BlogPost />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/events/:id" element={<EventDetail />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-              <Route path="/admin/contacts" element={<ProtectedRoute><AdminContacts /></ProtectedRoute>} />
-              <Route path="/admin/blog" element={<ProtectedRoute><AdminBlog /></ProtectedRoute>} />
-              <Route path="/admin/events" element={<ProtectedRoute><AdminEvents /></ProtectedRoute>} />
-            </Routes>
-          </main>
-          <Footer />
-          <Toaster position="top-right" richColors />
-        </div>
-      </Router>
-    </AuthProvider>
+          <div className="App">
+            <Header />
+            <main>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/vision" element={<Vision />} />
+                <Route path="/programs" element={<Programs />} />
+                <Route path="/governance" element={<Governance />} />
+                <Route path="/partnerships" element={<Partnerships />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:id" element={<BlogPost />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/events/:id" element={<EventDetail />} />
+                <Route path="/contact" element={<Contact />} />
+                
+                {/* Admin Auth Route */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                
+                {/* Protected Admin Routes with Layout */}
+                <Route path="/admin" element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="contacts" element={<AdminContacts />} />
+                  <Route path="blog" element={<AdminBlog />} />
+                  <Route path="events" element={<AdminEvents />} />
+                </Route>
+                
+                {/* Catch all - redirect to home */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+            <Footer />
+            <Toaster position="top-right" richColors />
+          </div>
+        </Router>
+      </AuthProvider>
     </HelmetProvider>
   );
 }
