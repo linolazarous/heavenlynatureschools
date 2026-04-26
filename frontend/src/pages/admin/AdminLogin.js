@@ -1,13 +1,12 @@
 // frontend/src/pages/admin/AdminLogin.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, Key, Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
+import { Lock, Mail, Key, Eye, EyeOff, Shield, AlertCircle, School } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminApi } from '../../utils/api';
 
 // ✅ Pull from environment
-const DEFAULT_ADMIN_EMAIL =
-  process.env.REACT_APP_ADMIN_EMAIL || 'admin@heavenlynature.com';
+const DEFAULT_ADMIN_EMAIL = process.env.REACT_APP_ADMIN_EMAIL || 'admin@heavenlynature.com';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -24,10 +23,18 @@ const AdminLogin = () => {
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (token) {
-      // Verify token is still valid (optional)
       navigate('/admin');
     }
   }, [navigate]);
+
+  // ✅ Load remembered email
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem('remember_email');
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // ✅ Handle login
   const handleSubmit = async (e) => {
@@ -46,17 +53,6 @@ const AdminLogin = () => {
       const response = await adminApi.login(email.trim(), password);
       
       if (response.access_token) {
-        // Store tokens
-        localStorage.setItem('access_token', response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
-        
-        // Store user info if provided
-        if (response.user) {
-          localStorage.setItem('user', JSON.stringify(response.user));
-        }
-        
         // Remember me functionality
         if (rememberMe) {
           localStorage.setItem('remember_email', email);
@@ -65,8 +61,6 @@ const AdminLogin = () => {
         }
         
         toast.success('Welcome back, Admin! 🎉');
-        
-        // Redirect to admin dashboard
         navigate('/admin');
       } else {
         throw new Error('Invalid response from server');
@@ -81,49 +75,35 @@ const AdminLogin = () => {
     }
   };
 
-  // ✅ Load remembered email
-  useEffect(() => {
-    const rememberedEmail = localStorage.getItem('remember_email');
-    if (rememberedEmail) {
-      setEmail(rememberedEmail);
-      setRememberMe(true);
-    }
-  }, []);
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-md w-full px-6">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 transform transition-all duration-300 hover:shadow-3xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+      <div className="max-w-md w-full px-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 transform transition-all duration-300">
           
-          {/* Header */}
+          {/* Logo/Header */}
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Shield size={36} className="text-white" />
+            <div className="w-20 h-20 bg-gradient-to-r from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <School size={40} className="text-white" />
             </div>
             <h1 className="font-serif text-3xl font-bold text-primary mb-2">
               Admin Portal
             </h1>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-500 text-sm">
               Heavenly Nature Schools Administration
             </p>
           </div>
 
           {/* Error Alert */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3 animate-shake">
               <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-red-700 text-sm font-medium">{error}</p>
-                {error.includes('password') && (
-                  <Link to="/admin/forgot-password" className="text-xs text-red-600 hover:underline mt-1 inline-block">
-                    Forgot password?
-                  </Link>
-                )}
               </div>
             </div>
           )}
 
-          {/* Form */}
+          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div>
@@ -140,7 +120,7 @@ const AdminLogin = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@heavenlynature.com"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none"
                   autoComplete="email"
                 />
               </div>
@@ -161,7 +141,7 @@ const AdminLogin = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none"
                   autoComplete="current-password"
                 />
                 <button
@@ -170,21 +150,21 @@ const AdminLogin = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? 
-                    <EyeOff size={18} className="text-gray-400 hover:text-gray-600" /> : 
-                    <Eye size={18} className="text-gray-400 hover:text-gray-600" />
+                    <EyeOff size={18} className="text-gray-400 hover:text-gray-600 transition" /> : 
+                    <Eye size={18} className="text-gray-400 hover:text-gray-600 transition" />
                   }
                 </button>
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
+            {/* Remember Me */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-primary rounded focus:ring-primary"
+                  className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary focus:ring-2"
                 />
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
@@ -201,7 +181,7 @@ const AdminLogin = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-primary to-secondary text-white hover:shadow-lg rounded-full px-8 py-3 text-lg font-medium transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed transform hover:scale-105"
+              className="w-full bg-gradient-to-r from-primary to-secondary text-white hover:shadow-lg rounded-full px-8 py-3 text-lg font-medium transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-95"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -217,25 +197,44 @@ const AdminLogin = () => {
             </button>
           </form>
 
-          {/* Demo Credentials (for development only) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 font-medium mb-2">Demo Credentials:</p>
-              <div className="space-y-1 text-xs text-gray-600">
-                <p>📧 Email: admin@heavenlynature.com</p>
-                <p>🔑 Password: (as set in your backend)</p>
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
+          {/* Security Notice */}
           <div className="mt-6 pt-4 border-t text-center">
-            <p className="text-xs text-gray-500">
-              Secure admin access only • All activities are logged
-            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+              <Shield size={14} />
+              <span>Secure admin access only</span>
+              <span>•</span>
+              <span>All activities are logged</span>
+            </div>
+          </div>
+
+          {/* Back to Site Link */}
+          <div className="mt-4 text-center">
+            <Link 
+              to="/" 
+              className="text-sm text-gray-500 hover:text-primary transition"
+            >
+              ← Return to Website
+            </Link>
           </div>
         </div>
+
+        {/* Footer Note */}
+        <p className="text-center text-xs text-gray-400 mt-6">
+          © {new Date().getFullYear()} Heavenly Nature Schools. All rights reserved.
+        </p>
       </div>
+
+      {/* Add animation styles */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+          20%, 40%, 60%, 80% { transform: translateX(2px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };
