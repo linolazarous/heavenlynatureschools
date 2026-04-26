@@ -1,5 +1,5 @@
 // frontend/src/pages/EventDetail.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, ArrowLeft, Clock, Share2, Heart, Bookmark, Users, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,16 +20,28 @@ const EventDetail = () => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState([]);
 
-  useEffect(() => {
-    loadEvent();
-    // Check local storage for interested/saved status
-    const interestedEvents = JSON.parse(localStorage.getItem('interested_events') || '[]');
-    const savedEvents = JSON.parse(localStorage.getItem('saved_events') || '[]');
-    setInterested(interestedEvents.includes(id));
-    setSaved(savedEvents.includes(id));
-  }, [id]);
+  // ✅ Load related events with useCallback
+  const loadRelatedEvents = useCallback(async (currentEvent) => {
+    try {
+      const allEvents = await publicApi.getEvents();
+      const related = allEvents
+        .filter(e => (e._id || e.id) !== (currentEvent._id || currentEvent.id))
+        .filter(e => {
+          // Show events from same month or upcoming events
+          const currentDate = new Date(currentEvent.eventDate);
+          const eventDate = new Date(e.eventDate);
+          return eventDate.getMonth() === currentDate.getMonth() || 
+                 eventDate > new Date();
+        })
+        .slice(0, 3);
+      setRelatedEvents(related);
+    } catch (err) {
+      console.error('Failed to load related events:', err);
+    }
+  }, []);
 
-  const loadEvent = async () => {
+  // ✅ Load event with useCallback
+  const loadEvent = useCallback(async () => {
     setLoading(true);
     try {
       const data = await publicApi.getEvent(id);
@@ -50,28 +62,20 @@ const EventDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, loadRelatedEvents]);
 
-  const loadRelatedEvents = async (currentEvent) => {
-    try {
-      const allEvents = await publicApi.getEvents();
-      const related = allEvents
-        .filter(e => (e._id || e.id) !== (currentEvent._id || currentEvent.id))
-        .filter(e => {
-          // Show events from same month or upcoming events
-          const currentDate = new Date(currentEvent.eventDate);
-          const eventDate = new Date(e.eventDate);
-          return eventDate.getMonth() === currentDate.getMonth() || 
-                 eventDate > new Date();
-        })
-        .slice(0, 3);
-      setRelatedEvents(related);
-    } catch (err) {
-      console.error('Failed to load related events:', err);
-    }
-  };
+  // ✅ useEffect with proper dependencies
+  useEffect(() => {
+    loadEvent();
+    // Check local storage for interested/saved status
+    const interestedEvents = JSON.parse(localStorage.getItem('interested_events') || '[]');
+    const savedEvents = JSON.parse(localStorage.getItem('saved_events') || '[]');
+    setInterested(interestedEvents.includes(id));
+    setSaved(savedEvents.includes(id));
+  }, [id, loadEvent]);
 
-  const formatDate = (dateString) => {
+  // ✅ Memoized helper functions
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'Date TBD';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -80,21 +84,21 @@ const EventDetail = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
+  }, []);
 
-  const formatShortDate = (dateString) => {
+  const formatShortDate = useCallback((dateString) => {
     if (!dateString) return 'TBD';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
-  };
+  }, []);
 
-  const isUpcoming = (dateString) => {
+  const isUpcoming = useCallback((dateString) => {
     return new Date(dateString) >= new Date();
-  };
+  }, []);
 
-  const getDaysUntil = (dateString) => {
+  const getDaysUntil = useCallback((dateString) => {
     const eventDate = new Date(dateString);
     const now = new Date();
     const diffDays = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
@@ -103,10 +107,12 @@ const EventDetail = () => {
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
     return `In ${diffDays} days`;
-  };
+  }, []);
 
   // Handle share functionality
-  const handleShare = (platform) => {
+  const handleShare = useCallback((platform) => {
+    if (!event) return;
+    
     const url = window.location.href;
     const title = encodeURIComponent(event.title);
     
@@ -124,10 +130,10 @@ const EventDetail = () => {
       window.open(shareUrls[platform], '_blank', 'width=600,height=400');
     }
     setShowShareMenu(false);
-  };
+  }, [event]);
 
   // Handle interested
-  const handleInterested = () => {
+  const handleInterested = useCallback(() => {
     const newInterested = !interested;
     setInterested(newInterested);
     const interestedEvents = JSON.parse(localStorage.getItem('interested_events') || '[]');
@@ -140,10 +146,10 @@ const EventDetail = () => {
       toast.info('Removed from your interested events');
     }
     localStorage.setItem('interested_events', JSON.stringify(interestedEvents));
-  };
+  }, [interested, id]);
 
   // Handle save for later
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const newSaved = !saved;
     setSaved(newSaved);
     const savedEvents = JSON.parse(localStorage.getItem('saved_events') || '[]');
@@ -156,16 +162,18 @@ const EventDetail = () => {
       toast.info('Removed from saved events');
     }
     localStorage.setItem('saved_events', JSON.stringify(savedEvents));
-  };
+  }, [saved, id]);
 
   // Add to Google Calendar
-  const addToGoogleCalendar = () => {
+  const addToGoogleCalendar = useCallback(() => {
+    if (!event) return;
+    
     const startDate = new Date(event.eventDate);
     const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Assume 2 hours duration
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDate.toISOString().replace(/-|:|\./g, '')}/${endDate.toISOString().replace(/-|:|\./g, '')}&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location || '')}`;
     window.open(url, '_blank');
     toast.success('Opening Google Calendar...');
-  };
+  }, [event]);
 
   if (loading) {
     return (
