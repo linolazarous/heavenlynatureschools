@@ -1,0 +1,33 @@
+/* Global smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove default button styles */
+button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Smooth transitions for interactive elements */
+a, button {
+  transition: opacity 0.2s ease;
+}
+
+a:hover, button:hover {
+  opacity: 0.9;
+}
+
+/* Image optimization */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid hsl(var(--secondary));
+  outline-offset: 2px;
+}
