@@ -1,5 +1,5 @@
 // frontend/src/pages/Events.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, MapPin, ArrowRight, Clock, Users, Filter, Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,15 +14,8 @@ const Events = () => {
   const [filter, setFilter] = useState('all'); // all, upcoming, past
   const [viewMode, setViewMode] = useState('list'); // list, grid
 
-  useEffect(() => {
-    loadEvents();
-  }, []);
-
-  useEffect(() => {
-    filterEvents();
-  }, [events, filter]);
-
-  const loadEvents = async () => {
+  // ✅ Load events with useCallback
+  const loadEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -42,9 +35,10 @@ const Events = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // No dependencies needed
 
-  const filterEvents = () => {
+  // ✅ Filter events with useCallback
+  const filterEvents = useCallback(() => {
     const now = new Date();
     let filtered = [...events];
     
@@ -60,9 +54,20 @@ const Events = () => {
     }
     
     setFilteredEvents(filtered);
-  };
+  }, [events, filter]); // ✅ Add events and filter as dependencies
 
-  const formatDate = (dateString) => {
+  // ✅ Load events on mount
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  // ✅ Filter events when events or filter changes
+  useEffect(() => {
+    filterEvents();
+  }, [filterEvents]);
+
+  // ✅ Memoized helper functions
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'Date TBD';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -71,13 +76,13 @@ const Events = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
+  }, []);
 
-  const isUpcoming = (dateString) => {
+  const isUpcoming = useCallback((dateString) => {
     return new Date(dateString) >= new Date();
-  };
+  }, []);
 
-  const getEventStatus = (dateString) => {
+  const getEventStatus = useCallback((dateString) => {
     const eventDate = new Date(dateString);
     const now = new Date();
     const diffDays = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
@@ -86,16 +91,16 @@ const Events = () => {
     if (diffDays === 0) return { text: 'Today', color: 'text-red-600', bg: 'bg-red-50' };
     if (diffDays <= 7) return { text: `In ${diffDays} day${diffDays > 1 ? 's' : ''}`, color: 'text-orange-600', bg: 'bg-orange-50' };
     return { text: 'Upcoming', color: 'text-green-600', bg: 'bg-green-50' };
-  };
+  }, []);
 
-  const renderLoading = () => (
+  const renderLoading = useCallback(() => (
     <div className="text-center py-20">
       <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <p className="text-muted-foreground mt-4">Loading events...</p>
     </div>
-  );
+  ), []);
 
-  const renderError = () => (
+  const renderError = useCallback(() => (
     <div className="text-center py-20" data-testid="events-error-state">
       <div className="text-red-500 mb-4">
         <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,9 +115,9 @@ const Events = () => {
         Try Again
       </button>
     </div>
-  );
+  ), [error, loadEvents]);
 
-  const renderEmpty = () => (
+  const renderEmpty = useCallback(() => (
     <div className="text-center py-20" data-testid="events-empty-state">
       <div className="text-gray-400 mb-4">
         <CalendarIcon size={64} className="mx-auto" />
@@ -128,14 +133,13 @@ const Events = () => {
         Check back soon for updates and new activities!
       </p>
     </div>
-  );
+  ), [filter]);
 
-  const renderListView = () => (
+  const renderListView = useCallback(() => (
     <div className="space-y-6">
       {filteredEvents.map((event) => {
         const eventId = event._id || event.id;
         const status = getEventStatus(event.eventDate);
-        const upcoming = isUpcoming(event.eventDate);
         
         return (
           <article
@@ -195,14 +199,13 @@ const Events = () => {
         );
       })}
     </div>
-  );
+  ), [filteredEvents, formatDate, getEventStatus]);
 
-  const renderGridView = () => (
+  const renderGridView = useCallback(() => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {filteredEvents.map((event) => {
         const eventId = event._id || event.id;
         const status = getEventStatus(event.eventDate);
-        const upcoming = isUpcoming(event.eventDate);
         
         return (
           <article
@@ -259,15 +262,15 @@ const Events = () => {
         );
       })}
     </div>
-  );
+  ), [filteredEvents, formatDate, getEventStatus]);
 
-  const renderContent = () => {
+  const renderContent = useCallback(() => {
     if (loading) return renderLoading();
     if (error) return renderError();
     if (filteredEvents.length === 0) return renderEmpty();
     
     return viewMode === 'list' ? renderListView() : renderGridView();
-  };
+  }, [loading, error, filteredEvents, viewMode, renderLoading, renderError, renderEmpty, renderListView, renderGridView]);
 
   return (
     <div className="min-h-screen pt-24 bg-gradient-to-b from-gray-50 to-white" data-testid="events-page">
