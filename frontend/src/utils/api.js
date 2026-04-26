@@ -8,7 +8,7 @@ const getAccessToken = () => localStorage.getItem('access_token');
 const getRefreshToken = () => localStorage.getItem('refresh_token');
 
 const setAccessToken = (token) => {
-  localStorage.setItem('access_token', token);
+  if (token) localStorage.setItem('access_token', token);
 };
 
 const setRefreshToken = (token) => {
@@ -18,18 +18,18 @@ const setRefreshToken = (token) => {
 const clearTokens = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
 };
 
 // ─────────────────────────────────────────────
 // 🔄 REFRESH TOKEN
 // ─────────────────────────────────────────────
-let refreshPromise = null; // Prevent multiple refresh calls
+let refreshPromise = null;
 
-async function refreshToken() {
+async function refreshTokenFunction() {
   const refresh_token = getRefreshToken();
   if (!refresh_token) return false;
 
-  // If already refreshing, wait for that promise
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -46,12 +46,13 @@ async function refreshToken() {
         setAccessToken(data.access_token);
         return true;
       }
+      return false;
     } catch (err) {
       console.error('Refresh token failed:', err);
+      return false;
     } finally {
       refreshPromise = null;
     }
-    return false;
   })();
 
   return refreshPromise;
@@ -64,36 +65,55 @@ export async function apiFetch(path, options = {}) {
   let token = getAccessToken();
 
   const makeRequest = async (customToken) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
+    
+    if (customToken) {
+      headers.Authorization = `Bearer ${customToken}`;
+    }
+
     return fetch(`${BASE_URL}${path}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(customToken ? { Authorization: `Bearer ${customToken}` } : {}),
-        ...(options.headers || {}),
-      },
+      headers,
     });
   };
 
   let res = await makeRequest(token);
 
-  // 🔄 Handle expired token
+  // 🔄 Handle expired token (401 Unauthorized)
   if (res.status === 401) {
-    const refreshed = await refreshToken();
+    const refreshed = await refreshTokenFunction();
 
     if (refreshed) {
       token = getAccessToken();
       res = await makeRequest(token);
     } else {
       clearTokens();
-      // Redirect to login page
-      window.location.href = '/admin/login';
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/admin/login')) {
+        window.location.href = '/admin/login';
+      }
       throw new Error('Session expired. Please login again.');
     }
   }
 
+  // Handle other error responses
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(err.detail || 'Request failed');
+    let errorMessage;
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.detail || errorData.message || `Request failed with status ${res.status}`;
+    } catch {
+      errorMessage = `Request failed with status ${res.status}`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  // Return empty object for 204 No Content responses
+  if (res.status === 204) {
+    return {};
   }
 
   return res.json();
@@ -126,35 +146,72 @@ export const publicApi = {
 // 🔐 Admin endpoints (require authentication)
 export const adminApi = {
   // Auth
-  login: (email, password) => apiFetch('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  }).then(data => {
+  login: async (email, password) => {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || data.message || 'Login failed');
+    }
+
     if (data.access_token) {
       setAccessToken(data.access_token);
       if (data.refresh_token) setRefreshToken(data.refresh_token);
+      
+      // Store user info
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } else {
+        localStorage.setItem('user', JSON.stringify({ email, role: 'admin' }));
+      }
     }
+    
     return data;
-  }),
+  },
   
-  logout: () => {
-    clearTokens();
-    window.location.href = '/admin/login';
+  logout: async () => {
+    try {
+      const token = getAccessToken();
+      if (token) {
+        await fetch(`${BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+    } finally {
+      clearTokens();
+      window.location.href = '/admin/login';
+    }
+  },
+  
+  // Get current user
+  getCurrentUser: () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   },
   
   // Contacts
   getContacts: () => apiFetch('/api/admin/contacts'),
   getContact: (id) => apiFetch(`/api/admin/contacts/${id}`),
-  
-  // Add these to your adminApi object
-deleteContact: (id) => apiFetch(`/api/admin/contacts/${id}`, {
-  method: 'DELETE',
-}),
-
-toggleContactRead: (id, read) => apiFetch(`/api/admin/contacts/${id}`, {
-  method: 'PATCH',
-  body: JSON.stringify({ read }),
-}),
+  deleteContact: (id) => apiFetch(`/api/admin/contacts/${id}`, {
+    method: 'DELETE',
+  }),
+  toggleContactRead: (id, read) => apiFetch(`/api/admin/contacts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ read }),
+  }),
   
   // Blog (Admin)
   createBlog: (blogData) => apiFetch('/api/admin/blog', {
@@ -184,7 +241,7 @@ toggleContactRead: (id, read) => apiFetch(`/api/admin/contacts/${id}`, {
 };
 
 // ─────────────────────────────────────────────
-// 📤 FILE UPLOAD HELPER (if needed)
+// 📤 FILE UPLOAD HELPER
 // ─────────────────────────────────────────────
 export async function uploadFile(path, file, fieldName = 'file') {
   const token = getAccessToken();
@@ -200,11 +257,46 @@ export async function uploadFile(path, file, fieldName = 'file') {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
-    throw new Error(err.detail || 'Upload failed');
+    let errorMessage;
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.detail || errorData.message || 'Upload failed';
+    } catch {
+      errorMessage = 'Upload failed';
+    }
+    throw new Error(errorMessage);
   }
 
   return res.json();
 }
 
+// ─────────────────────────────────────────────
+// 🔧 UTILITY FUNCTIONS
+// ─────────────────────────────────────────────
+
+// Check if user is authenticated
+export const isAuthenticated = () => {
+  const token = getAccessToken();
+  if (!token) return false;
+  
+  // Optional: Check token expiration
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000;
+    return Date.now() < exp;
+  } catch {
+    return !!token;
+  }
+};
+
+// Get auth headers for external use
+export const getAuthHeaders = () => {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// ─────────────────────────────────────────────
+// 📦 EXPORTS
+// ─────────────────────────────────────────────
 export default BASE_URL;
+export { getAccessToken, getRefreshToken, setAccessToken, setRefreshToken, clearTokens };
