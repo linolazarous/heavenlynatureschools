@@ -2,77 +2,162 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 const AuthContext = createContext(null);
 
-const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const BASE_URL = process.env.REACT_APP_API_URL;
 
+// ─────────────────────────────────────────────
+// 🔧 API HELPER (JWT VERSION)
+// ─────────────────────────────────────────────
+const getAccessToken = () => localStorage.getItem('access_token');
+const getRefreshToken = () => localStorage.getItem('refresh_token');
+
+const setTokens = (access, refresh) => {
+  localStorage.setItem('access_token', access);
+  localStorage.setItem('refresh_token', refresh);
+};
+
+const clearTokens = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+};
+
+// 🔄 Refresh token function
+const refreshToken = async () => {
+  const refresh = getRefreshToken();
+  if (!refresh) return false;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    });
+
+    const data = await res.json();
+
+    if (data.access_token) {
+      localStorage.setItem('access_token', data.access_token);
+      return true;
+    }
+  } catch (err) {
+    console.error('Token refresh failed:', err);
+  }
+
+  return false;
+};
+
+// 🔐 Main API function
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  let token = getAccessToken();
+
+  let res = await fetch(`${BASE_URL}${path}`, {
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
   });
+
+  // 🔄 Auto refresh if expired
+  if (res.status === 401) {
+    const refreshed = await refreshToken();
+
+    if (refreshed) {
+      token = getAccessToken();
+      res = await fetch(`${BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+    } else {
+      clearTokens();
+      throw new Error('Session expired. Please login again.');
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Request failed' }));
     throw new Error(err.detail || 'Request failed');
   }
+
   return res.json();
 }
 
+// ─────────────────────────────────────────────
+// 🔐 AUTH PROVIDER
+// ─────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-  // undefined = still checking, null = not authenticated, object = authenticated user
-  const [user, setUser] = useState(undefined);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ Initialize user from token
   const checkAuth = useCallback(async () => {
     try {
-      const data = await apiFetch('/api/auth/me');
-      setUser(data);
-    } catch {
-      // /api/auth/me returning non-200 means no active session — set to null (unauthenticated)
+      const token = getAccessToken();
+      if (!token) {
+        setUser(null);
+        return;
+      }
+
+      // decode payload (basic client-side check)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+
+      setUser({
+        email: payload.email,
+        role: payload.role,
+      });
+    } catch (err) {
+      console.error('Auth check failed:', err);
+      clearTokens();
       setUser(null);
+    } finally {
+      setIsLoading(false);
     }
-    // apiFetch is module-level stable; setUser is a stable React state setter
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
+  // 🔐 LOGIN
   const login = async (email, password) => {
-    const data = await apiFetch('/api/auth/login', {
+    const data = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
-    });
-    setUser(data);
+    }).then(res => res.json());
+
+    if (!data.access_token) {
+      throw new Error('Login failed');
+    }
+
+    setTokens(data.access_token, data.refresh_token);
+
+    setUser(data.user);
     return data;
   };
 
-  const logout = async () => {
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST' });
-    } catch (error) {
-      // Logout errors are non-critical; session is cleared locally regardless.
-      // Log only in development so failures are visible during debugging
-      // without leaking internals to production users.
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Logout request failed (clearing local session anyway):', error);
-      }
-    }
+  // 🔓 LOGOUT
+  const logout = () => {
+    clearTokens();
     setUser(null);
   };
 
-  // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo(
-    () => ({ user, login, logout, isLoading: user === undefined }),
-    // login and logout are defined in the provider scope; re-created on user change is acceptable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user]
+    () => ({
+      user,
+      login,
+      logout,
+      isLoading,
+      apiFetch, // 🔥 expose for global use
+    }),
+    [user, isLoading]
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);
