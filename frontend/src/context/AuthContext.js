@@ -1,62 +1,80 @@
+// frontend/src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { adminApi } from '../utils/api';
 
 const AuthContext = createContext(null);
 
-const BASE_URL = process.env.REACT_APP_API_URL;
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://heavenlynatureschools-l9e8.onrender.com';
 
 // ─────────────────────────────────────────────
-// 🔧 API HELPER (JWT VERSION)
+// 🔧 TOKEN HELPERS (Synchronized with api.js)
 // ─────────────────────────────────────────────
-const getAccessToken = () => localStorage.getItem('access_token');
-const getRefreshToken = () => localStorage.getItem('refresh_token');
+export const getAccessToken = () => localStorage.getItem('access_token');
+export const getRefreshToken = () => localStorage.getItem('refresh_token');
 
-const setTokens = (access, refresh) => {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
+export const setTokens = (access, refresh) => {
+  if (access) localStorage.setItem('access_token', access);
+  if (refresh) localStorage.setItem('refresh_token', refresh);
 };
 
-const clearTokens = () => {
+export const clearTokens = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
 };
 
 // 🔄 Refresh token function
-const refreshToken = async () => {
+let refreshPromise = null;
+
+export const refreshToken = async () => {
   const refresh = getRefreshToken();
   if (!refresh) return false;
 
-  try {
-    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refresh }),
-    });
+  // Prevent multiple concurrent refresh requests
+  if (refreshPromise) return refreshPromise;
 
-    const data = await res.json();
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
 
-    if (data.access_token) {
-      localStorage.setItem('access_token', data.access_token);
-      return true;
+      const data = await res.json();
+
+      if (data.access_token) {
+        setTokens(data.access_token, null);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Token refresh failed:', err);
+      return false;
+    } finally {
+      refreshPromise = null;
     }
-  } catch (err) {
-    console.error('Token refresh failed:', err);
-  }
+  })();
 
-  return false;
+  return refreshPromise;
 };
 
-// 🔐 Main API function
+// 🔐 Main API function (syncs with api.js)
 async function apiFetch(path, options = {}) {
   let token = getAccessToken();
 
-  let res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  const makeRequest = async (customToken) => {
+    return fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(customToken ? { Authorization: `Bearer ${customToken}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  };
+
+  let res = await makeRequest(token);
 
   // 🔄 Auto refresh if expired
   if (res.status === 401) {
@@ -64,16 +82,10 @@ async function apiFetch(path, options = {}) {
 
     if (refreshed) {
       token = getAccessToken();
-      res = await fetch(`${BASE_URL}${path}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          ...(options.headers || {}),
-        },
-      });
+      res = await makeRequest(token);
     } else {
       clearTokens();
+      window.location.href = '/admin/login';
       throw new Error('Session expired. Please login again.');
     }
   }
@@ -92,6 +104,7 @@ async function apiFetch(path, options = {}) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // ✅ Initialize user from token
   const checkAuth = useCallback(async () => {
@@ -99,20 +112,42 @@ export const AuthProvider = ({ children }) => {
       const token = getAccessToken();
       if (!token) {
         setUser(null);
+        setIsAuthenticated(false);
         return;
       }
 
-      // decode payload (basic client-side check)
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // Decode JWT payload (basic client-side check)
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        
+        // Check if token is expired
+        const exp = payload.exp * 1000; // Convert to milliseconds
+        if (Date.now() >= exp) {
+          console.warn('Token expired');
+          clearTokens();
+          setUser(null);
+          setIsAuthenticated(false);
+          return;
+        }
 
-      setUser({
-        email: payload.email,
-        role: payload.role,
-      });
+        setUser({
+          id: payload.sub || payload.id,
+          email: payload.email,
+          role: payload.role || 'admin',
+          name: payload.name,
+        });
+        setIsAuthenticated(true);
+      } catch (decodeError) {
+        console.error('Token decode failed:', decodeError);
+        clearTokens();
+        setUser(null);
+        setIsAuthenticated(false);
+      }
     } catch (err) {
       console.error('Auth check failed:', err);
       clearTokens();
       setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
     }
@@ -124,26 +159,77 @@ export const AuthProvider = ({ children }) => {
 
   // 🔐 LOGIN
   const login = async (email, password) => {
-    const data = await fetch(`${BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    }).then(res => res.json());
+    try {
+      // Use the existing login endpoint
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!data.access_token) {
-      throw new Error('Login failed');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || 'Login failed');
+      }
+
+      if (!data.access_token) {
+        throw new Error('No access token received');
+      }
+
+      // Store tokens
+      setTokens(data.access_token, data.refresh_token);
+
+      // Store user info
+      const userData = {
+        email: data.email || email,
+        role: data.role || 'admin',
+        name: data.name || email.split('@')[0],
+      };
+      
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Set user state
+      setUser(userData);
+      setIsAuthenticated(true);
+
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-
-    setTokens(data.access_token, data.refresh_token);
-
-    setUser(data.user);
-    return data;
   };
 
   // 🔓 LOGOUT
-  const logout = () => {
-    clearTokens();
-    setUser(null);
+  const logout = async () => {
+    try {
+      // Optional: Call logout endpoint if exists
+      const token = getAccessToken();
+      if (token) {
+        try {
+          await fetch(`${BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (err) {
+          console.warn('Logout endpoint failed:', err);
+        }
+      }
+    } catch (err) {
+      console.warn('Logout error:', err);
+    } finally {
+      clearTokens();
+      setUser(null);
+      setIsAuthenticated(false);
+      window.location.href = '/admin/login';
+    }
+  };
+
+  // ✅ Update user profile (if needed)
+  const updateUser = (updates) => {
+    const updatedUser = { ...user, ...updates };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const value = useMemo(
@@ -151,13 +237,47 @@ export const AuthProvider = ({ children }) => {
       user,
       login,
       logout,
+      updateUser,
       isLoading,
+      isAuthenticated,
       apiFetch, // 🔥 expose for global use
+      getAccessToken,
+      refreshToken,
     }),
-    [user, isLoading]
+    [user, isLoading, isAuthenticated]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => useContext(AuthContext);
+// ─────────────────────────────────────────────
+// 🎣 CUSTOM HOOKS
+// ─────────────────────────────────────────────
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+// ✅ Role-based access hook
+export const useRequireAuth = () => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      window.location.href = '/admin/login';
+    }
+  }, [isAuthenticated, isLoading]);
+
+  return { isAuthenticated, isLoading, user };
+};
+
+// ✅ Admin check hook
+export const useIsAdmin = () => {
+  const { user } = useAuth();
+  return user?.role === 'admin';
+};
+
+export default AuthContext;
