@@ -1,5 +1,5 @@
 // frontend/src/pages/BlogPost.js
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, ArrowLeft, Clock, Share2, Heart, Bookmark, Facebook, Twitter, Linkedin, Mail } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -17,16 +17,8 @@ const BlogPost = () => {
   const [saved, setSaved] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
-  useEffect(() => {
-    loadBlogPost();
-    // Check local storage for liked/saved status
-    const likedPosts = JSON.parse(localStorage.getItem('liked_posts') || '[]');
-    const savedPosts = JSON.parse(localStorage.getItem('saved_posts') || '[]');
-    setLiked(likedPosts.includes(id));
-    setSaved(savedPosts.includes(id));
-  }, [id]);
-
-  const loadBlogPost = async () => {
+  // ✅ Load blog post with useCallback to prevent recreation
+  const loadBlogPost = useCallback(async () => {
     setLoading(true);
     try {
       const data = await publicApi.getBlog(id);
@@ -45,7 +37,17 @@ const BlogPost = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]); // ✅ Add id as dependency
+
+  // ✅ Load post and check localStorage
+  useEffect(() => {
+    loadBlogPost();
+    // Check local storage for liked/saved status
+    const likedPosts = JSON.parse(localStorage.getItem('liked_posts') || '[]');
+    const savedPosts = JSON.parse(localStorage.getItem('saved_posts') || '[]');
+    setLiked(likedPosts.includes(id));
+    setSaved(savedPosts.includes(id));
+  }, [id, loadBlogPost]); // ✅ Add loadBlogPost as dependency
 
   // Sanitize HTML to prevent XSS before rendering
   const sanitizedContent = useMemo(
@@ -54,24 +56,24 @@ const BlogPost = () => {
   );
 
   // Calculate read time
-  const calculateReadTime = (content) => {
+  const calculateReadTime = useCallback((content) => {
     if (!content) return '3 min read';
     const wordCount = content.split(/\s+/).length;
     const readTime = Math.ceil(wordCount / 200);
     return `${readTime} min read`;
-  };
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'Date TBD';
     return new Date(dateString).toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
     });
-  };
+  }, []);
 
   // Handle share functionality
-  const handleShare = (platform) => {
+  const handleShare = useCallback((platform) => {
     const url = window.location.href;
     const title = encodeURIComponent(post.title);
     
@@ -89,10 +91,10 @@ const BlogPost = () => {
       window.open(shareUrls[platform], '_blank', 'width=600,height=400');
     }
     setShowShareMenu(false);
-  };
+  }, [post?.title]);
 
   // Handle like
-  const handleLike = () => {
+  const handleLike = useCallback(() => {
     const newLiked = !liked;
     setLiked(newLiked);
     const likedPosts = JSON.parse(localStorage.getItem('liked_posts') || '[]');
@@ -104,10 +106,10 @@ const BlogPost = () => {
       if (index > -1) likedPosts.splice(index, 1);
     }
     localStorage.setItem('liked_posts', JSON.stringify(likedPosts));
-  };
+  }, [liked, id]);
 
   // Handle save for later
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const newSaved = !saved;
     setSaved(newSaved);
     const savedPosts = JSON.parse(localStorage.getItem('saved_posts') || '[]');
@@ -120,7 +122,7 @@ const BlogPost = () => {
       toast.info('Removed from reading list');
     }
     localStorage.setItem('saved_posts', JSON.stringify(savedPosts));
-  };
+  }, [saved, id]);
 
   if (loading) {
     return (
