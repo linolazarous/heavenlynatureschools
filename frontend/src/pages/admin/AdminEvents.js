@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Edit, Trash2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,40 +18,60 @@ const AdminEvents = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
 
-  useEffect(() => {
-    apiFetch('/api/events')
-      .then(data => setEvents(data))
-      .catch(() => toast.error('Failed to load events'));
-    // apiFetch is a stable module import; state setters are stable React references
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ✅ Load events
+  const loadEvents = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/events');
+
+      // Sort newest first
+      const sorted = [...data].sort(
+        (a, b) => new Date(b.eventDate) - new Date(a.eventDate)
+      );
+
+      setEvents(sorted);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load events');
+    }
   }, []);
 
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  // ✅ Reset form
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingEvent(null);
+    setFormData(emptyForm);
+  };
+
+  // ✅ Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
       if (editingEvent) {
-        const updated = await apiFetch(`/api/admin/events/${editingEvent.id}`, {
+        await apiFetch(`/api/admin/events/${editingEvent.id}`, {
           method: 'PUT',
           body: JSON.stringify(formData),
         });
-        setEvents(prev => prev.map(ev => ev.id === editingEvent.id ? updated : ev));
         toast.success('Event updated successfully');
       } else {
-        const created = await apiFetch('/api/admin/events', {
+        await apiFetch('/api/admin/events', {
           method: 'POST',
           body: JSON.stringify(formData),
         });
-        setEvents(prev => [created, ...prev]);
         toast.success('Event created successfully');
       }
-      setShowForm(false);
-      setEditingEvent(null);
-      setFormData(emptyForm);
+
+      await loadEvents(); // 🔄 always sync with backend
+      resetForm();
     } catch (err) {
       toast.error(err.message || 'Failed to save event');
     }
   };
 
+  // ✅ Edit
   const handleEdit = (event) => {
     setEditingEvent(event);
     setFormData({
@@ -64,98 +84,127 @@ const AdminEvents = () => {
     setShowForm(true);
   };
 
+  // ✅ Delete
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this event?')) return;
+
     try {
       await apiFetch(`/api/admin/events/${id}`, { method: 'DELETE' });
-      setEvents(prev => prev.filter(ev => ev.id !== id));
       toast.success('Event deleted');
+
+      await loadEvents(); // 🔄 always sync
     } catch (err) {
       toast.error(err.message || 'Failed to delete');
     }
   };
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  // ✅ Change
+  const handleChange = (e) =>
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
+  // ✅ Format date
   const formatDate = (d) =>
     new Date(d).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
 
   return (
-    <div className="min-h-screen bg-background" data-testid="admin-events-page">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
       <div className="bg-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link to="/admin" className="hover:text-white/80" data-testid="back-to-dashboard">
-                <ArrowLeft size={24} />
-              </Link>
-              <div className="flex items-center space-x-3">
-                <Calendar size={32} />
-                <h1 className="font-serif text-2xl font-bold">Manage Events</h1>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Link to="/admin">
+              <ArrowLeft size={24} />
+            </Link>
+            <div className="flex items-center space-x-3">
+              <Calendar size={32} />
+              <h1 className="text-2xl font-bold">Manage Events</h1>
             </div>
-            <button
-              onClick={() => { setShowForm(!showForm); setEditingEvent(null); setFormData(emptyForm); }}
-              className="flex items-center space-x-2 bg-secondary text-primary hover:bg-secondary/90 px-4 py-2 rounded-full transition-colors"
-              data-testid="add-event-btn"
-            >
-              <Plus size={20} />
-              <span>New Event</span>
-            </button>
           </div>
+
+          <button
+            onClick={() => {
+              setShowForm(!showForm);
+              setEditingEvent(null);
+              setFormData(emptyForm);
+            }}
+            className="flex items-center gap-2 bg-secondary text-primary px-4 py-2 rounded-full"
+          >
+            <Plus size={20} />
+            New Event
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
+
+        {/* Form */}
         {showForm && (
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-8" data-testid="event-form">
-            <h2 className="font-serif text-2xl font-semibold text-primary mb-6">
-              {editingEvent ? 'Edit Event' : 'Create New Event'}
+          <div className="bg-white p-8 rounded-2xl shadow mb-8">
+            <h2 className="text-2xl font-semibold mb-6">
+              {editingEvent ? 'Edit Event' : 'Create Event'}
             </h2>
+
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Event Title *</label>
-                <input type="text" name="title" required value={formData.title} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="event-title-input" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Description *</label>
-                <textarea name="description" required rows="6" value={formData.description} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="event-description-input"></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Event Date & Time *</label>
-                <input type="datetime-local" name="eventDate" required value={formData.eventDate} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="event-date-input" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Location</label>
-                <input type="text" name="location" value={formData.location} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="event-location-input" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Image URL</label>
-                <input type="url" name="imageUrl" value={formData.imageUrl} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary"
-                  data-testid="event-image-input" />
-              </div>
-              <div className="flex space-x-4">
-                <button type="submit"
-                  className="bg-primary text-white hover:bg-primary/90 rounded-full px-8 py-3 font-medium transition-colors"
-                  data-testid="event-submit-btn">
-                  {editingEvent ? 'Update Event' : 'Create Event'}
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="Event Title"
+                required
+                className="w-full p-3 border rounded"
+              />
+
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Description"
+                required
+                rows="5"
+                className="w-full p-3 border rounded"
+              />
+
+              <input
+                type="datetime-local"
+                name="eventDate"
+                value={formData.eventDate}
+                onChange={handleChange}
+                required
+                className="w-full p-3 border rounded"
+              />
+
+              <input
+                type="text"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="Location"
+                className="w-full p-3 border rounded"
+              />
+
+              <input
+                type="url"
+                name="imageUrl"
+                value={formData.imageUrl}
+                onChange={handleChange}
+                placeholder="Image URL"
+                className="w-full p-3 border rounded"
+              />
+
+              <div className="flex gap-4">
+                <button className="bg-primary text-white px-6 py-2 rounded-full">
+                  {editingEvent ? 'Update' : 'Create'}
                 </button>
-                <button type="button"
-                  onClick={() => { setShowForm(false); setEditingEvent(null); setFormData(emptyForm); }}
-                  className="border border-gray-300 text-muted-foreground hover:bg-gray-50 rounded-full px-8 py-3 font-medium transition-colors"
-                  data-testid="event-cancel-btn">
+
+                <button type="button" onClick={resetForm} className="border px-6 py-2 rounded-full">
                   Cancel
                 </button>
               </div>
@@ -163,40 +212,36 @@ const AdminEvents = () => {
           </div>
         )}
 
+        {/* List */}
         {events.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl" data-testid="no-events">
-            <Calendar size={64} className="mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">No events yet</p>
+          <div className="text-center py-20 bg-white rounded-2xl">
+            <Calendar size={64} className="mx-auto mb-4 text-gray-400" />
+            <p className="text-xl text-gray-500">No events yet</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {events.map((event) => (
-              <div key={event.id} className="bg-white rounded-2xl p-6 shadow-lg flex justify-between items-start"
-                data-testid={`event-${event.id}`}>
-                <div className="flex-1">
-                  <h3 className="font-serif text-2xl font-semibold text-primary mb-2">{event.title}</h3>
-                  <p className="text-muted-foreground mb-2">{event.description}</p>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p><strong>Date:</strong> {formatDate(event.eventDate)}</p>
-                    {event.location && <p><strong>Location:</strong> {event.location}</p>}
-                  </div>
+            {events.map(event => (
+              <div key={event.id} className="bg-white p-6 rounded-2xl shadow flex justify-between">
+                <div>
+                  <h3 className="text-xl font-bold">{event.title}</h3>
+                  <p>{event.description}</p>
+                  <p className="text-sm text-gray-500">{formatDate(event.eventDate)}</p>
+                  {event.location && <p className="text-sm">{event.location}</p>}
                 </div>
-                <div className="flex space-x-2 ml-4">
-                  <button onClick={() => handleEdit(event)}
-                    className="text-primary hover:bg-primary/10 p-2 rounded-lg transition-colors"
-                    data-testid={`edit-event-${event.id}`}>
-                    <Edit size={20} />
+
+                <div className="flex gap-2">
+                  <button onClick={() => handleEdit(event)}>
+                    <Edit />
                   </button>
-                  <button onClick={() => handleDelete(event.id)}
-                    className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors"
-                    data-testid={`delete-event-${event.id}`}>
-                    <Trash2 size={20} />
+                  <button onClick={() => handleDelete(event.id)}>
+                    <Trash2 />
                   </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+
       </div>
     </div>
   );
