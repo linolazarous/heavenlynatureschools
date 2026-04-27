@@ -18,15 +18,16 @@ import {
   EyeOff,
   RefreshCw,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Share2  // ✅ Added missing Share2 import
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { adminApi, apiFetch } from '../../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
 const AdminSettings = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Changed to true initially
   const [saving, setSaving] = useState(false);
   
   // Password change state
@@ -88,10 +89,10 @@ const AdminSettings = () => {
     try {
       const data = await apiFetch('/api/admin/settings').catch(() => null);
       if (data) {
-        setSiteSettings(prev => ({ ...prev, ...data.siteSettings }));
-        setSocialLinks(prev => ({ ...prev, ...data.socialLinks }));
-        setNotificationSettings(prev => ({ ...prev, ...data.notificationSettings }));
-        setSecuritySettings(prev => ({ ...prev, ...data.securitySettings }));
+        if (data.siteSettings) setSiteSettings(prev => ({ ...prev, ...data.siteSettings }));
+        if (data.socialLinks) setSocialLinks(prev => ({ ...prev, ...data.socialLinks }));
+        if (data.notificationSettings) setNotificationSettings(prev => ({ ...prev, ...data.notificationSettings }));
+        if (data.securitySettings) setSecuritySettings(prev => ({ ...prev, ...data.securitySettings }));
       }
       
       // Load user profile
@@ -170,6 +171,7 @@ const AdminSettings = () => {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       userData.name = profileData.name;
       userData.email = profileData.email;
+      userData.phone = profileData.phone;
       localStorage.setItem('user', JSON.stringify(userData));
       
       toast.success('Profile updated successfully! ✅');
@@ -207,7 +209,7 @@ const AdminSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="mt-4 text-gray-500">Loading settings...</p>
