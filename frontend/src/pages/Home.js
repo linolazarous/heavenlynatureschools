@@ -1,3 +1,4 @@
+// frontend/src/pages/Home.js
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Heart, BookOpen, Users, Award } from 'lucide-react';
@@ -11,15 +12,17 @@ const Home = () => {
         title="Nurturing Right Leaders — Juba City, South Sudan"
         description="Heavenly Nature Nursery &amp; Primary School provides free, faith-based education to street children, orphans, and abandoned children in Juba City, South Sudan."
       />
+      
+      {/* Hero Section with Local Background Image */}
       <section
-        className="relative h-[90vh] flex items-center justify-center bg-cover bg-center"
+        className="relative h-[90vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage:
-            'linear-gradient(to bottom, rgba(0,31,91,0.4), rgba(0,31,91,0.8)), url(https://images.unsplash.com/photo-1521493959102-bdd6677fdd81?crop=entropy&cs=srgb&fm=jpg&q=85)'
+          backgroundImage: `linear-gradient(to bottom, rgba(0,31,91,0.5), rgba(0,31,91,0.85)), url('/hero-bg.jpg')`
         }}
         data-testid="hero-section"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white z-10">
+        <div className="absolute inset-0 bg-black/30"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white z-10">
           <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             Nurturing Right Leaders
           </h1>
@@ -49,6 +52,7 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Impact Section */}
       <section className="py-20 md:py-32 bg-white" data-testid="impact-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -88,15 +92,16 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Mission Section with Local Background */}
       <section
-        className="py-20 md:py-32 bg-cover bg-center relative"
+        className="py-20 md:py-32 bg-cover bg-center bg-no-repeat relative"
         style={{
-          backgroundImage:
-            'linear-gradient(rgba(0,31,91,0.92), rgba(0,31,91,0.92)), url(https://images.unsplash.com/flagged/photo-1555251255-e9a095d6eb9d?crop=entropy&cs=srgb&fm=jpg&q=85)'
+          backgroundImage: `linear-gradient(rgba(0,31,91,0.92), rgba(0,31,91,0.92)), url('/hero-bg.jpg')`
         }}
         data-testid="mission-section"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white relative z-10">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white z-10">
           <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-6">
             Our Mission
           </h2>
@@ -115,6 +120,7 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Programs Preview Section */}
       <section className="py-20 md:py-32 bg-background" data-testid="programs-preview-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -167,6 +173,7 @@ const Home = () => {
         </div>
       </section>
 
+      {/* CTA Section */}
       <section className="py-20 md:py-32 bg-gradient-to-br from-primary to-primary/90 text-white" data-testid="cta-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-6">
