@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/AdminBlog.js
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Edit, Trash2, FileText, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminApi, publicApi } from '../../utils/api';
 
@@ -111,6 +111,7 @@ const AdminBlog = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const emptyForm = {
     title: '',
@@ -127,6 +128,7 @@ const AdminBlog = () => {
     setLoading(true);
     try {
       const data = await publicApi.getBlogs();
+      console.log('Loaded posts:', data); // Debug log
       setPosts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Load posts error:', err);
@@ -151,23 +153,29 @@ const AdminBlog = () => {
   // ✅ Submit (Create or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
       if (editingPost) {
         await adminApi.updateBlog(editingPost._id || editingPost.id, formData);
         toast.success('Blog post updated successfully! ✅');
       } else {
-        await adminApi.createBlog(formData);
+        const response = await adminApi.createBlog(formData);
+        console.log('Create response:', response);
         toast.success('Blog post created successfully! ✅');
       }
-      await loadPosts();
+      
+      // Reset form first
       resetForm();
+      
+      // Then reload posts to show the new one
+      await loadPosts();
+      
     } catch (err) {
       console.error('Save error:', err);
       toast.error(err.message || 'Failed to save blog post');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -253,7 +261,10 @@ const AdminBlog = () => {
               </button>
               
               <button
-                onClick={() => { setShowForm(!showForm); resetForm(); }}
+                onClick={() => { 
+                  resetForm();
+                  setShowForm(!showForm); 
+                }}
                 className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary/90 transition"
                 disabled={loading}
               >
@@ -281,7 +292,7 @@ const AdminBlog = () => {
                 onChange={handleChange}
                 onSubmit={handleSubmit}
                 onCancel={resetForm}
-                loading={loading}
+                loading={isSubmitting}
               />
             )}
 
