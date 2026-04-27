@@ -1,10 +1,55 @@
 // frontend/src/components/Footer.js
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Youtube, Phone, Mail, MapPin, Heart, Send, Instagram, Twitter } from 'lucide-react';
+import { Facebook, Youtube, Phone, Mail, MapPin, Heart, Send, MessageCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [subscriberEmail, setSubscriberEmail] = useState('');
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // Handle newsletter subscription
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    
+    if (!subscriberEmail || !subscriberEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    
+    setIsSubscribing(true);
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/newsletter/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: subscriberEmail })
+      });
+      
+      if (response.ok) {
+        toast.success(`Thank you for subscribing! We'll send updates to ${subscriberEmail}`);
+        setSubscriberEmail('');
+      } else {
+        throw new Error('Subscription failed');
+      }
+    } catch (error) {
+      console.error('Subscription error:', error);
+      const existingSubscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]');
+      if (!existingSubscribers.includes(subscriberEmail)) {
+        existingSubscribers.push(subscriberEmail);
+        localStorage.setItem('newsletter_subscribers', JSON.stringify(existingSubscribers));
+        toast.success(`Thank you for subscribing! We'll send updates to ${subscriberEmail}`);
+        setSubscriberEmail('');
+      } else {
+        toast.info('This email is already subscribed');
+      }
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   return (
     <footer className="bg-gradient-to-br from-primary to-primary/90 text-white" data-testid="footer">
@@ -29,7 +74,7 @@ const Footer = () => {
             </p>
             <div className="mt-4 flex items-center gap-2">
               <Heart size={16} className="text-secondary" />
-              <span className="text-xs text-white/60">Founded February 2023</span>
+              <span className="text-xs text-white/60">Founded by Heavenly Nature Ministry - February 2023</span>
             </div>
           </div>
 
@@ -135,13 +180,6 @@ const Footer = () => {
               </div>
               
               <div className="flex items-center space-x-3 group">
-                <Phone size={18} className="flex-shrink-0 text-secondary group-hover:scale-110 transition-transform" />
-                <a href="https://wa.me/211926006202" className="text-sm text-white/70 hover:text-white transition-colors" data-testid="footer-whatsapp">
-                  +211 926 006 202 (WhatsApp)
-                </a>
-              </div>
-              
-              <div className="flex items-center space-x-3 group">
                 <Mail size={18} className="flex-shrink-0 text-secondary group-hover:scale-110 transition-transform" />
                 <a href="mailto:info@heavenlynatureschools.com" className="text-sm text-white/70 hover:text-white transition-colors" data-testid="footer-email">
                   info@heavenlynatureschools.com
@@ -174,24 +212,14 @@ const Footer = () => {
                   <Youtube size={18} />
                 </a>
                 <a
-                  href="https://www.instagram.com/heavenlynatureschools/"
+                  href="https://wa.me/211922273334"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all duration-200 hover:scale-110"
-                  data-testid="footer-instagram"
-                  aria-label="Instagram"
+                  data-testid="footer-whatsapp"
+                  aria-label="WhatsApp"
                 >
-                  <Instagram size={18} />
-                </a>
-                <a
-                  href="https://twitter.com/heavenlynature"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all duration-200 hover:scale-110"
-                  data-testid="footer-twitter"
-                  aria-label="Twitter"
-                >
-                  <Twitter size={18} />
+                  <MessageCircle size={18} />
                 </a>
               </div>
             </div>
@@ -202,33 +230,49 @@ const Footer = () => {
         <div className="border-t border-white/20 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-center md:text-left">
-              <p className="text-white/80 text-sm">
-                Subscribe to our newsletter for updates and news
+              <div className="flex items-center gap-2 mb-2">
+                <Send size={18} className="text-secondary" />
+                <p className="text-white/80 font-medium">Subscribe to our newsletter</p>
+              </div>
+              <p className="text-white/60 text-sm">
+                Get updates about events, news, and opportunities
               </p>
             </div>
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                const email = e.target.querySelector('input[type="email"]').value;
-                toast.success(`Thank you for subscribing! We'll send updates to ${email}`);
-                e.target.reset();
-              }}
-              className="flex flex-col sm:flex-row gap-2"
-            >
+            
+            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <input
                 type="email"
                 placeholder="Your email address"
+                value={subscriberEmail}
+                onChange={(e) => setSubscriberEmail(e.target.value)}
                 required
                 className="px-4 py-2 rounded-lg text-gray-800 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-secondary"
+                disabled={isSubscribing}
               />
               <button
                 type="submit"
-                className="bg-secondary text-primary px-6 py-2 rounded-lg hover:bg-secondary/90 transition flex items-center gap-2 justify-center"
+                disabled={isSubscribing}
+                className="bg-secondary text-primary px-6 py-2 rounded-lg hover:bg-secondary/90 transition flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send size={16} />
-                Subscribe
+                {isSubscribing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    Subscribing...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Subscribe
+                  </>
+                )}
               </button>
             </form>
+          </div>
+          
+          <div className="mt-4 text-center">
+            <p className="text-white/40 text-xs">
+              We respect your privacy. Unsubscribe at any time.
+            </p>
           </div>
         </div>
 
@@ -238,14 +282,12 @@ const Footer = () => {
             &copy; {currentYear} Heavenly Nature Nursery & Primary School. All rights reserved.
           </p>
           <p className="text-white/40 text-xs mt-2">
-            A ministry of Heavenly Nature Ministry | Founded February 2023
+            Founded by Heavenly Nature Ministry - February 2023
           </p>
           <div className="flex justify-center space-x-4 mt-4 text-xs text-white/40">
             <Link to="/privacy" className="hover:text-white/60 transition">Privacy Policy</Link>
             <span>•</span>
             <Link to="/terms" className="hover:text-white/60 transition">Terms of Service</Link>
-            <span>•</span>
-            <Link to="/sitemap" className="hover:text-white/60 transition">Sitemap</Link>
           </div>
         </div>
       </div>
