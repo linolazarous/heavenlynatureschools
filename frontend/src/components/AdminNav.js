@@ -1,3 +1,8 @@
+update the admin navbar with this setting 
+
+{ path: '/admin/settings', label: 'Settings', icon: Settings }
+
+
 // frontend/src/components/AdminNav.js
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
