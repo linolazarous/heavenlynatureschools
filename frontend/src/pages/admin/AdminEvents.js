@@ -13,7 +13,7 @@ const emptyForm = {
 };
 
 // ─── Event Form Component ─────────────────────────────────────────
-const EventForm = ({ formData, editingEvent, onChange, onSubmit, onCancel, loading }) => (
+const EventForm = ({ formData, editingEvent, onChange, onSubmit, onCancel, isSubmitting }) => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg mb-8">
     <h2 className="font-serif text-2xl font-semibold text-primary mb-6">
       {editingEvent ? 'Edit Event' : 'Create New Event'}
@@ -97,10 +97,10 @@ const EventForm = ({ formData, editingEvent, onChange, onSubmit, onCancel, loadi
       <div className="flex gap-4">
         <button 
           type="submit" 
-          disabled={loading}
+          disabled={isSubmitting}
           className="bg-primary text-white px-6 py-2 rounded-full hover:bg-primary/90 transition disabled:opacity-50"
         >
-          {editingEvent ? 'Update Event' : 'Create Event'}
+          {isSubmitting ? (editingEvent ? 'Updating...' : 'Creating...') : (editingEvent ? 'Update Event' : 'Create Event')}
         </button>
         <button 
           type="button" 
@@ -120,6 +120,7 @@ const AdminEvents = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
 
   // ✅ Load events from MongoDB
@@ -127,6 +128,7 @@ const AdminEvents = () => {
     setLoading(true);
     try {
       const data = await publicApi.getEvents();
+      console.log('Loaded events:', data); // Debug log
       
       // Sort by event date (upcoming first)
       const sorted = [...data].sort(
@@ -148,31 +150,37 @@ const AdminEvents = () => {
 
   // ✅ Reset form
   const resetForm = () => {
-    setShowForm(false);
+    setFormData({ ...emptyForm });
     setEditingEvent(null);
-    setFormData(emptyForm);
+    setShowForm(false);
   };
 
   // ✅ Submit (Create or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
       if (editingEvent) {
         await adminApi.updateEvent(editingEvent._id || editingEvent.id, formData);
         toast.success('Event updated successfully! ✅');
       } else {
-        await adminApi.createEvent(formData);
+        const response = await adminApi.createEvent(formData);
+        console.log('Create response:', response);
         toast.success('Event created successfully! ✅');
       }
-      await loadEvents();
+      
+      // Reset form first
       resetForm();
+      
+      // Then reload events to show the new one
+      await loadEvents();
+      
     } catch (err) {
       console.error('Save error:', err);
       toast.error(err.message || 'Failed to save event');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -237,6 +245,12 @@ const AdminEvents = () => {
     return new Date(eventDate) > new Date();
   };
 
+  // ✅ Open new event form
+  const openNewEventForm = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       {/* Page Header */}
@@ -266,12 +280,9 @@ const AdminEvents = () => {
               </button>
               
               <button
-                onClick={() => {
-                  setShowForm(!showForm);
-                  resetForm();
-                }}
+                onClick={openNewEventForm}
                 className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary/90 transition"
-                disabled={loading}
+                disabled={loading || isSubmitting}
               >
                 <Plus size={18} /> New Event
               </button>
@@ -297,17 +308,17 @@ const AdminEvents = () => {
                 onChange={handleChange}
                 onSubmit={handleSubmit}
                 onCancel={resetForm}
-                loading={loading}
+                isSubmitting={isSubmitting}
               />
             )}
 
             {/* Empty State */}
-            {events.length === 0 && !showForm && (
+            {!loading && events.length === 0 && !showForm && (
               <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
                 <Calendar size={64} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-xl text-gray-500 dark:text-gray-400 mb-4">No events scheduled yet</p>
                 <button
-                  onClick={() => setShowForm(true)}
+                  onClick={openNewEventForm}
                   className="bg-primary text-white px-6 py-2 rounded-full hover:bg-primary/90 transition"
                 >
                   Create Your First Event
