@@ -22,7 +22,8 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
-import AdminLayout from './layouts/AdminLayout'; // Import AdminLayout
+import AdminSettings from './pages/admin/AdminSettings'; // ✅ Import AdminSettings
+import AdminLayout from './layouts/AdminLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -75,6 +76,7 @@ function App() {
                   <Route path="contacts" element={<AdminContacts />} />
                   <Route path="blog" element={<AdminBlog />} />
                   <Route path="events" element={<AdminEvents />} />
+                  <Route path="settings" element={<AdminSettings />} /> {/* ✅ Added Settings Route */}
                 </Route>
                 
                 {/* Catch all - redirect to home */}
