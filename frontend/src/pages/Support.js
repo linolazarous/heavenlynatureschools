@@ -1,25 +1,38 @@
-import React from 'react';
+// frontend/src/pages/Support.js
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DollarSign, Users, Heart, Briefcase, ArrowRight } from 'lucide-react';
+import { DollarSign, Users, Heart, Briefcase, ArrowRight, Copy, Check, Building, Landmark, CreditCard, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import SEO from '../components/SEO';
 
 const Support = () => {
+  const [copiedField, setCopiedField] = useState(null);
+
+  const copyToClipboard = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    toast.success(`${field} copied to clipboard!`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   return (
     <div className="min-h-screen pt-24" data-testid="support-page">
       <SEO
         path="/support"
-        title="Support Us"
+        title="Support Us | Heavenly Nature Schools"
         description="Support Heavenly Nature Schools and help provide free education to street children and orphans in Juba City. Donate, volunteer, or give in-kind — every contribution matters."
+        keywords="donate, support, volunteer, bank details, Heavenly Nature Schools, Juba, South Sudan"
       />
+      
+      {/* Hero Section */}
       <section
         className="py-32 bg-cover bg-center relative"
         style={{
-          backgroundImage:
-            'linear-gradient(rgba(0,31,91,0.85), rgba(0,31,91,0.85)), url(https://images.unsplash.com/photo-1720420865912-2bbd6bfa1e85?crop=entropy&cs=srgb&fm=jpg&q=85)'
+          backgroundImage: `linear-gradient(rgba(0,31,91,0.85), rgba(0,31,91,0.85)), url('/hero-bg.jpg')`
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white relative z-10">
-          <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6">
+          <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6 animate-fade-in">
             Make a Difference
           </h1>
           <p className="text-xl md:text-2xl text-white/95 max-w-3xl mx-auto">
@@ -158,18 +171,134 @@ const Support = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-primary to-primary/90 text-white rounded-2xl p-10 md:p-12 text-center mb-12">
-            <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-6">
+          {/* Bank Details Section */}
+          <div className="bg-gradient-to-br from-primary to-primary/90 text-white rounded-2xl p-10 md:p-12 mb-12" data-testid="bank-details">
+            <div className="text-center mb-8">
+              <Building size={48} className="mx-auto mb-4 text-secondary" />
+              <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-4">
+                Bank Transfer Details
+              </h2>
+              <p className="text-xl text-white/95 max-w-3xl mx-auto">
+                Make a direct bank transfer using the details below
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Account Information */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Landmark size={24} className="text-secondary" />
+                  <h3 className="text-xl font-semibold">Account Information</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Account Name</p>
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <p className="font-mono text-sm">HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL</p>
+                      <button
+                        onClick={() => copyToClipboard('HEAVENLY NATURE NURSERY AND PRIMARY SCHOOL', 'Account Name')}
+                        className="p-1 hover:bg-white/10 rounded transition"
+                      >
+                        {copiedField === 'Account Name' ? <Check size={16} /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Account Number (SSP)</p>
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <p className="font-mono text-lg font-bold">641925</p>
+                      <button
+                        onClick={() => copyToClipboard('641925', 'SSP Account')}
+                        className="p-1 hover:bg-white/10 rounded transition"
+                      >
+                        {copiedField === 'SSP Account' ? <Check size={16} /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Account Number (USD)</p>
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <p className="font-mono text-lg font-bold">641926</p>
+                      <button
+                        onClick={() => copyToClipboard('641926', 'USD Account')}
+                        className="p-1 hover:bg-white/10 rounded transition"
+                      >
+                        {copiedField === 'USD Account' ? <Check size={16} /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Information */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard size={24} className="text-secondary" />
+                  <h3 className="text-xl font-semibold">Bank Information</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Bank Name</p>
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="font-semibold">EDEN COMMERCIAL BANK</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">SWIFT Code</p>
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <p className="font-mono font-bold">EDBKSSJB</p>
+                      <button
+                        onClick={() => copyToClipboard('EDBKSSJB', 'SWIFT Code')}
+                        className="p-1 hover:bg-white/10 rounded transition"
+                      >
+                        {copiedField === 'SWIFT Code' ? <Check size={16} /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Branch</p>
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p>Gudele Branch, Juba, South Sudan</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Branch Address</p>
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm">Gudele area Juba, South Sudan</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-white/90">
+                <strong className="text-yellow-300">Important:</strong> Please include your name and contact information in the transfer reference so we can acknowledge your donation. After making a transfer, please notify us at <a href="mailto:info@heavenlynatureschools.com" className="text-secondary underline">info@heavenlynatureschools.com</a> or call <a href="tel:+211922273334" className="text-secondary underline">+211 922 273 334</a>.
+              </p>
+            </div>
+          </div>
+
+          {/* Impact Section */}
+          <div className="bg-gradient-to-br from-secondary to-secondary/80 rounded-2xl p-10 md:p-12 text-center mb-12">
+            <h2 className="font-serif text-3xl md:text-4xl font-semibold text-primary mb-6">
               Your Impact Matters
             </h2>
-            <p className="text-xl text-white/95 max-w-3xl mx-auto leading-relaxed mb-8">
+            <p className="text-xl text-primary/90 max-w-3xl mx-auto leading-relaxed mb-8">
               Every donation, every hour volunteered, and every partnership formed brings us closer to our goal of
               providing quality education to every child in need. Together, we are nurturing the leaders of tomorrow.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 to="/contact"
-                className="bg-secondary text-primary hover:bg-secondary/90 rounded-full px-8 py-4 text-lg font-medium transition-all duration-300 inline-flex items-center"
+                className="bg-primary text-white hover:bg-primary/90 rounded-full px-8 py-4 text-lg font-medium transition-all duration-300 inline-flex items-center"
                 data-testid="support-contact-btn"
               >
                 Get in Touch
@@ -177,24 +306,31 @@ const Support = () => {
               </Link>
               <a
                 href="mailto:info@heavenlynatureschools.com"
-                className="border-2 border-white text-white hover:bg-white hover:text-primary rounded-full px-8 py-4 text-lg font-medium transition-all duration-300"
+                className="border-2 border-primary text-primary hover:bg-primary hover:text-white rounded-full px-8 py-4 text-lg font-medium transition-all duration-300"
                 data-testid="support-email-btn"
               >
                 Email Us
               </a>
             </div>
           </div>
-
-          <div className="bg-accent/30 rounded-2xl p-10 text-center">
-            <h2 className="font-serif text-3xl font-semibold text-primary mb-4">
-              Bank Details (Coming Soon)
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              We are currently setting up our donation infrastructure. Please <Link to="/contact" className="text-primary underline">contact us</Link> directly to discuss how you can support our mission.
-            </p>
-          </div>
         </div>
       </section>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.8s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
