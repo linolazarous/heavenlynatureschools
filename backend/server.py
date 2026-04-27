@@ -1,55 +1,3 @@
-Update and add this to server if it is missing 
-# Add to server.py
-
-# Change password endpoint
-@api_router.post("/admin/change-password")
-async def change_password(
-    request: Request,
-    user: dict = Depends(require_admin)
-):
-    data = await request.json()
-    current_password = data.get("currentPassword")
-    new_password = data.get("newPassword")
-    
-    # Get user from database
-    db_user = await db.users.find_one({"_id": ObjectId(user["sub"])})
-    
-    if not verify_password(current_password, db_user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Current password is incorrect")
-    
-    # Update password
-    new_hash = hash_password(new_password)
-    await db.users.update_one(
-        {"_id": ObjectId(user["sub"])},
-        {"$set": {"password_hash": new_hash}}
-    )
-    
-    return {"message": "Password changed successfully"}
-
-# Update profile endpoint
-@api_router.put("/admin/update-profile")
-async def update_profile(
-    request: Request,
-    user: dict = Depends(require_admin)
-):
-    data = await request.json()
-    
-    await db.users.update_one(
-        {"_id": ObjectId(user["sub"])},
-        {"$set": {
-            "name": data.get("name"),
-            "email": data.get("email"),
-            "phone": data.get("phone")
-        }}
-    )
-    
-    return {"message": "Profile updated successfully"}
-    
-    
-    
-
-backend/server.py 
-
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -116,6 +64,7 @@ def create_access_token(user: dict) -> str:
         "sub": str(user["_id"]),
         "email": user["email"],
         "role": user.get("role", "user"),
+        "name": user.get("name", user["email"].split("@")[0]),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MIN),
     }
@@ -228,6 +177,15 @@ class AdminSettings(BaseModel):
     instagram: str = ""
     linkedin: str = ""
 
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+class UpdateProfileRequest(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = ""
+
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
 # ─────────────────────────────────────────────────────────────
@@ -266,9 +224,68 @@ async def refresh(data: RefreshRequest):
 
 @api_router.post("/auth/logout")
 async def logout(user: dict = Depends(require_admin)):
-    # In a stateless JWT system, logout is handled client-side
-    # This endpoint exists for future blacklist implementation
     return {"message": "Logged out successfully"}
+
+# ─────────────────────────────────────────────────────────────
+# ADMIN PROFILE & PASSWORD ROUTES (NEW)
+# ─────────────────────────────────────────────────────────────
+
+@api_router.post("/admin/change-password")
+async def change_password(
+    data: ChangePasswordRequest,
+    user: dict = Depends(require_admin)
+):
+    """Change admin password"""
+    # Get user from database
+    db_user = await db.users.find_one({"_id": ObjectId(user["sub"])})
+    
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not verify_password(data.currentPassword, db_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Validate new password length
+    if len(data.newPassword) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    
+    # Update password
+    new_hash = hash_password(data.newPassword)
+    await db.users.update_one(
+        {"_id": ObjectId(user["sub"])},
+        {"$set": {"password_hash": new_hash, "updatedAt": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": "Password changed successfully"}
+
+@api_router.put("/admin/update-profile")
+async def update_profile(
+    data: UpdateProfileRequest,
+    user: dict = Depends(require_admin)
+):
+    """Update admin profile information"""
+    # Check if email is already taken by another user
+    existing_user = await db.users.find_one({
+        "email": data.email.lower(),
+        "_id": {"$ne": ObjectId(user["sub"])}
+    })
+    
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already in use by another account")
+    
+    # Update user profile
+    await db.users.update_one(
+        {"_id": ObjectId(user["sub"])},
+        {"$set": {
+            "name": data.name,
+            "email": data.email.lower(),
+            "phone": data.phone,
+            "updatedAt": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Profile updated successfully"}
 
 # ─────────────────────────────────────────────────────────────
 # CONTACT ROUTES (Full CRUD)
@@ -449,7 +466,6 @@ async def save_settings(settings_data: AdminSettings, user=Depends(require_admin
 
 @api_router.get("/health")
 async def health():
-    # Check database connection
     try:
         await db.command('ping')
         db_status = "connected"
@@ -477,7 +493,6 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    # Create admin user if not exists
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
 
@@ -489,7 +504,9 @@ async def startup():
             "password_hash": hash_password(admin_password),
             "role": "admin",
             "name": "Administrator",
-            "createdAt": datetime.now(timezone.utc).isoformat()
+            "phone": "",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "updatedAt": datetime.now(timezone.utc).isoformat()
         })
         logger.info(f"Admin user created: {admin_email}")
     else:
