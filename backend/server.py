@@ -1,3 +1,55 @@
+Update and add this to server if it is missing 
+# Add to server.py
+
+# Change password endpoint
+@api_router.post("/admin/change-password")
+async def change_password(
+    request: Request,
+    user: dict = Depends(require_admin)
+):
+    data = await request.json()
+    current_password = data.get("currentPassword")
+    new_password = data.get("newPassword")
+    
+    # Get user from database
+    db_user = await db.users.find_one({"_id": ObjectId(user["sub"])})
+    
+    if not verify_password(current_password, db_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Update password
+    new_hash = hash_password(new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(user["sub"])},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    return {"message": "Password changed successfully"}
+
+# Update profile endpoint
+@api_router.put("/admin/update-profile")
+async def update_profile(
+    request: Request,
+    user: dict = Depends(require_admin)
+):
+    data = await request.json()
+    
+    await db.users.update_one(
+        {"_id": ObjectId(user["sub"])},
+        {"$set": {
+            "name": data.get("name"),
+            "email": data.get("email"),
+            "phone": data.get("phone")
+        }}
+    )
+    
+    return {"message": "Profile updated successfully"}
+    
+    
+    
+
+backend/server.py 
+
 from dotenv import load_dotenv
 load_dotenv()
 
