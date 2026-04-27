@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/AdminLogin.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, Key, Eye, EyeOff, Shield, AlertCircle, School } from 'lucide-react';
+import { Lock, Mail, Key, Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminApi } from '../../utils/api';
 
@@ -82,8 +82,12 @@ const AdminLogin = () => {
           
           {/* Logo/Header */}
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-r from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <School size={40} className="text-white" />
+            <div className="flex items-center justify-center mb-4">
+              <img 
+                src="/logo.webp" 
+                alt="Heavenly Nature Schools Logo" 
+                className="h-20 w-20 object-contain"
+              />
             </div>
             <h1 className="font-serif text-3xl font-bold text-primary mb-2">
               Admin Portal
