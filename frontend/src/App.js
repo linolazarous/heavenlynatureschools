@@ -17,12 +17,14 @@ import BlogPost from './pages/BlogPost';
 import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
 import Contact from './pages/Contact';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
-import AdminSettings from './pages/admin/AdminSettings'; // ✅ Import AdminSettings
+import AdminSettings from './pages/admin/AdminSettings';
 import AdminLayout from './layouts/AdminLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -62,6 +64,8 @@ function App() {
                 <Route path="/events" element={<Events />} />
                 <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
                 
                 {/* Admin Auth Route */}
                 <Route path="/admin/login" element={<AdminLogin />} />
@@ -76,7 +80,7 @@ function App() {
                   <Route path="contacts" element={<AdminContacts />} />
                   <Route path="blog" element={<AdminBlog />} />
                   <Route path="events" element={<AdminEvents />} />
-                  <Route path="settings" element={<AdminSettings />} /> {/* ✅ Added Settings Route */}
+                  <Route path="settings" element={<AdminSettings />} />
                 </Route>
                 
                 {/* Catch all - redirect to home */}
