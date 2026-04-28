@@ -212,7 +212,7 @@ const Footer = () => {
                   <Youtube size={18} />
                 </a>
                 <a
-                  href="https://wa.me/211922273334"
+                  href="https://wa.me/211926006202"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all duration-200 hover:scale-110"
