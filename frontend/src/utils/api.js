@@ -19,6 +19,8 @@ const clearTokens = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('admin_info'); // ✅ Clear admin info too
+  localStorage.removeItem('remember_email'); // ✅ Clear remembered email
 };
 
 // ─────────────────────────────────────────────
@@ -145,7 +147,9 @@ export const publicApi = {
 
 // 🔐 Admin endpoints (require authentication)
 export const adminApi = {
-  // Auth
+  // ─────────────────────────────────────────────
+  // 🔑 AUTH
+  // ─────────────────────────────────────────────
   login: async (email, password) => {
     const response = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
@@ -163,11 +167,20 @@ export const adminApi = {
       setAccessToken(data.access_token);
       if (data.refresh_token) setRefreshToken(data.refresh_token);
       
-      // Store user info
+      // ✅ Store user info with permissions for multi-admin support
       if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
+        const userInfo = {
+          email: data.user.email,
+          role: data.user.role || 'admin',
+          name: data.user.name || data.user.email?.split('@')[0],
+          permissions: data.user.permissions || {}
+        };
+        localStorage.setItem('user', JSON.stringify(userInfo));
+        localStorage.setItem('admin_info', JSON.stringify(userInfo)); // ✅ Store admin info separately
       } else {
-        localStorage.setItem('user', JSON.stringify({ email, role: 'admin' }));
+        const basicInfo = { email, role: 'admin' };
+        localStorage.setItem('user', JSON.stringify(basicInfo));
+        localStorage.setItem('admin_info', JSON.stringify(basicInfo));
       }
     }
     
@@ -189,7 +202,7 @@ export const adminApi = {
     }
   },
   
-  // Get current user
+  // ✅ Get current user (supports both old and new format)
   getCurrentUser: () => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -201,8 +214,81 @@ export const adminApi = {
     }
     return null;
   },
+
+  // ✅ Get current admin info (for multi-admin support)
+  getCurrentAdmin: () => {
+    const adminInfo = localStorage.getItem('admin_info');
+    if (adminInfo) {
+      try {
+        return JSON.parse(adminInfo);
+      } catch {
+        return null;
+      }
+    }
+    // Fallback to user info
+    return adminApi.getCurrentUser();
+  },
+
+  // ✅ Check if current user is super admin
+  isSuperAdmin: () => {
+    const admin = adminApi.getCurrentAdmin();
+    return admin?.role === 'super_admin';
+  },
+
+  // ✅ Check specific permission
+  hasPermission: (permission) => {
+    const admin = adminApi.getCurrentAdmin();
+    if (admin?.role === 'super_admin') return true; // Super admin has all permissions
+    return admin?.permissions?.[permission] || false;
+  },
+
+  // ✅ Get admin profile
+  getProfile: () => apiFetch('/api/admin/profile'),
+
+  // ✅ Change password
+  changePassword: (currentPassword, newPassword) => apiFetch('/api/admin/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }),
+
+  // ✅ Update profile
+  updateProfile: (profileData) => apiFetch('/api/admin/update-profile', {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  }),
+
+  // ─────────────────────────────────────────────
+  // 👥 ADMIN MANAGEMENT (Super Admin Only)
+  // ─────────────────────────────────────────────
+
+  // ✅ Get all admins
+  getAdmins: () => apiFetch('/api/admin/admins'),
+
+  // ✅ Create new admin
+  createAdmin: (adminData) => apiFetch('/api/admin/admins', {
+    method: 'POST',
+    body: JSON.stringify(adminData),
+  }),
+
+  // ✅ Update admin
+  updateAdmin: (id, adminData) => apiFetch(`/api/admin/admins/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(adminData),
+  }),
+
+  // ✅ Toggle admin active status
+  toggleAdminStatus: (id) => apiFetch(`/api/admin/admins/${id}/toggle-status`, {
+    method: 'PATCH',
+  }),
+
+  // ✅ Delete admin
+  deleteAdmin: (id) => apiFetch(`/api/admin/admins/${id}`, {
+    method: 'DELETE',
+  }),
   
-  // Contacts
+  // ─────────────────────────────────────────────
+  // 📧 CONTACTS
+  // ─────────────────────────────────────────────
   getContacts: () => apiFetch('/api/admin/contacts'),
   getContact: (id) => apiFetch(`/api/admin/contacts/${id}`),
   deleteContact: (id) => apiFetch(`/api/admin/contacts/${id}`, {
@@ -213,7 +299,9 @@ export const adminApi = {
     body: JSON.stringify({ read }),
   }),
   
-  // Blog (Admin)
+  // ─────────────────────────────────────────────
+  // 📝 BLOG (Admin)
+  // ─────────────────────────────────────────────
   createBlog: (blogData) => apiFetch('/api/admin/blog', {
     method: 'POST',
     body: JSON.stringify(blogData),
@@ -226,7 +314,9 @@ export const adminApi = {
     method: 'DELETE',
   }),
   
-  // Events (Admin)
+  // ─────────────────────────────────────────────
+  // 📅 EVENTS (Admin)
+  // ─────────────────────────────────────────────
   createEvent: (eventData) => apiFetch('/api/admin/events', {
     method: 'POST',
     body: JSON.stringify(eventData),
@@ -238,6 +328,20 @@ export const adminApi = {
   deleteEvent: (id) => apiFetch(`/api/admin/events/${id}`, {
     method: 'DELETE',
   }),
+
+  // ─────────────────────────────────────────────
+  // ⚙️ SETTINGS
+  // ─────────────────────────────────────────────
+  getSettings: () => apiFetch('/api/admin/settings'),
+  saveSettings: (settingsData) => apiFetch('/api/admin/settings', {
+    method: 'POST',
+    body: JSON.stringify(settingsData),
+  }),
+
+  // ─────────────────────────────────────────────
+  // 📊 STATS
+  // ─────────────────────────────────────────────
+  getStats: () => apiFetch('/api/admin/stats'),
 };
 
 // ─────────────────────────────────────────────
