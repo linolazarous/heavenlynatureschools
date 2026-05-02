@@ -25,10 +25,13 @@ import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminSettings from './pages/admin/AdminSettings';
+import ManageAdmins from './pages/admin/ManageAdmins'; // ✅ Import ManageAdmins
 import AdminLayout from './layouts/AdminLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { adminApi } from './utils/api'; // ✅ Import adminApi for super admin check
 import './App.css';
 
+// ✅ Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, isLoading } = useAuth();
   if (isLoading) {
@@ -39,6 +42,28 @@ const ProtectedRoute = ({ children }) => {
     );
   }
   if (!user) return <Navigate to="/admin/login" replace />;
+  return children;
+};
+
+// ✅ Super Admin Protected Route Component
+const SuperAdminRoute = ({ children }) => {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+  
+  if (!user) return <Navigate to="/admin/login" replace />;
+  
+  // Check if user is super admin
+  if (!adminApi.isSuperAdmin()) {
+    return <Navigate to="/admin" replace />;
+  }
+  
   return children;
 };
 
@@ -81,6 +106,13 @@ function App() {
                   <Route path="blog" element={<AdminBlog />} />
                   <Route path="events" element={<AdminEvents />} />
                   <Route path="settings" element={<AdminSettings />} />
+                  
+                  {/* ✅ Manage Admins Route - Super Admin Only */}
+                  <Route path="manage-admins" element={
+                    <SuperAdminRoute>
+                      <ManageAdmins />
+                    </SuperAdminRoute>
+                  } />
                 </Route>
                 
                 {/* Catch all - redirect to home */}
