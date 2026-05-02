@@ -13,7 +13,9 @@ import {
   Settings,
   School,
   MessageCircle,
-  Star
+  Star,
+  Shield,
+  UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
@@ -27,12 +29,14 @@ const AdminDashboard = () => {
     blogPosts: 0, 
     events: 0,
     upcomingEvents: 0,
+    admins: 0,
     recentContacts: []
   });
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   // Settings state
   const [settings, setSettings] = useState({
@@ -46,7 +50,7 @@ const AdminDashboard = () => {
     sessionTimeout: 30,
     twoFactorAuth: false,
     siteName: 'Heavenly Nature Schools',
-    siteEmail: 'info@heavenlynature.com',
+    siteEmail: 'info@heavenlynatureschools.com',
     contactPhone: '+211 922 273 334',
     contactAddress: 'Juba City, Central Equatoria State, South Sudan',
     facebook: 'https://www.facebook.com/share/1CPEyYC14f/',
@@ -55,14 +59,21 @@ const AdminDashboard = () => {
     linkedin: ''
   });
 
+  // ✅ Check if current user is super admin
+  useEffect(() => {
+    const adminInfo = adminApi.getCurrentAdmin();
+    setIsSuperAdmin(adminInfo?.role === 'super_admin');
+  }, []);
+
   // ✅ Fetch dashboard stats
   const fetchStats = useCallback(async () => {
     setLoading(true);
     try {
-      const [contacts, blogPosts, events] = await Promise.all([
+      const [contacts, blogPosts, events, statsData] = await Promise.all([
         adminApi.getContacts().catch(() => []),
         publicApi.getBlogs().catch(() => []),
-        publicApi.getEvents().catch(() => [])
+        publicApi.getEvents().catch(() => []),
+        apiFetch('/api/admin/stats').catch(() => null)
       ]);
 
       const unreadCount = contacts.filter(c => !c.read).length;
@@ -79,6 +90,7 @@ const AdminDashboard = () => {
         blogPosts: blogPosts.length,
         events: events.length,
         upcomingEvents: upcomingEvents,
+        admins: statsData?.admins || 0,
         recentContacts: recentContacts
       });
       
@@ -236,8 +248,28 @@ const AdminDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Welcome back, {user?.name || user?.email?.split('@')[0] || 'Admin'}! 👋</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Here's what's happening with your school today.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+                Welcome back, {user?.name || user?.email?.split('@')[0] || 'Admin'}! 👋
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 mt-1">
+                Here's what's happening with your school today.
+              </p>
+            </div>
+            
+            {/* ✅ Manage Admins Button - Visible only to Super Admin */}
+            {isSuperAdmin && (
+              <Link
+                to="/admin/manage-admins"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:shadow-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 transform hover:scale-105"
+              >
+                <Shield size={20} />
+                <span className="font-medium">Manage Admins</span>
+                <UserPlus size={16} />
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -282,13 +314,26 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Total Content Card */}
+          {/* ✅ Admins Card - Shows admin count */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-            <div className="bg-orange-100 dark:bg-orange-900/30 p-3 rounded-xl mb-3">
-              <TrendingUp size={24} className="text-orange-600 dark:text-orange-400" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-xl">
+                <Users size={24} className="text-purple-600 dark:text-purple-400" />
+              </div>
+              {isSuperAdmin && (
+                <Link 
+                  to="/admin/manage-admins"
+                  className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline"
+                >
+                  Manage
+                </Link>
+              )}
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.contacts + stats.blogPosts + stats.events}</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Content</p>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{loading ? '...' : stats.admins || 1}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Admin Accounts</p>
+            {isSuperAdmin && (
+              <p className="text-purple-600 text-xs mt-2">Super Admin access</p>
+            )}
           </div>
         </div>
 
@@ -350,13 +395,24 @@ const AdminDashboard = () => {
             <p className="text-gray-500 dark:text-gray-400 text-sm">Read and respond to messages</p>
           </Link>
 
-          <button onClick={() => setShowSettings(true)} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
-            <div className="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-              <Settings size={32} className="text-gray-600 dark:text-gray-400" />
-            </div>
-            <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Settings</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Configure your dashboard</p>
-          </button>
+          {/* ✅ Manage Admins Card - Visible only to Super Admin */}
+          {isSuperAdmin ? (
+            <Link to="/admin/manage-admins" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center border-2 border-purple-200 dark:border-purple-800">
+              <div className="bg-purple-100 dark:bg-purple-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                <Shield size={32} className="text-purple-600 dark:text-purple-400" />
+              </div>
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Manage Admins</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Add and manage admin accounts</p>
+            </Link>
+          ) : (
+            <button onClick={() => setShowSettings(true)} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
+              <div className="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                <Settings size={32} className="text-gray-600 dark:text-gray-400" />
+              </div>
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Settings</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Configure your dashboard</p>
+            </button>
+          )}
         </div>
 
         {/* Last Updated */}
