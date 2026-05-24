@@ -16,6 +16,7 @@ import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
+import SchoolLive from '@/pages/SchoolLive';
 import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
@@ -88,6 +89,7 @@ function App() {
                 <Route path="/blog/:id" element={<BlogPost />} />
                 <Route path="/events" element={<Events />} />
                 <Route path="/events/:id" element={<EventDetail />} />
+                <Route path="/school/live" element={<SchoolLive />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
