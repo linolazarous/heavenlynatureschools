@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { adminApi, publicApi, apiFetch } from '../../utils/api';
+import AdminIDCard from './AdminIDCard';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
