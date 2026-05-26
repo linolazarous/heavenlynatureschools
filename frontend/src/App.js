@@ -18,6 +18,7 @@ import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
 import SchoolLive from '@/pages/SchoolLive';
 import Contact from './pages/Contact';
+import SchoolVerify from '@/pages/SchoolVerify';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -91,6 +92,7 @@ function App() {
                 <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/school/live" element={<SchoolLive />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/verify/:id" element={<SchoolVerify />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 
