@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Facebook, ExternalLink, GraduationCap, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import axios from '../api/axios';
+import { apiFetch } from '../utils/api';
 import { io } from 'socket.io-client';
 import LiveChatPanel from '../components/live/LiveChatPanel';
 
@@ -48,18 +48,20 @@ const SchoolLive = () => {
 
     const getFacebookInfo = async () => {
       try {
-        const res = await axios.get('/facebook/comments');
-        if (mounted && res.data.post_id) {
-          setFacebookPostId(res.data.post_id);
-          setFacebookMessages(res.data.comments || []);
+        const res = await apiFetch('/facebook/comments');
+        if (mounted && res.post_id) {
+          setFacebookPostId(res.post_id);
+          setFacebookMessages(res.comments || []);
         }
-      } catch (error) {}
+      } catch (error) {
+        console.error('Failed to fetch Facebook comments:', error);
+      }
     };
     getFacebookInfo();
 
     const connectSocket = () => {
       try {
-        const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.heavenlynatureministry.com';
+        const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.heavenlynatureschools.com';
         newSocket = io(API_URL, { 
           transports: ['websocket', 'polling'],
           reconnection: true,
@@ -72,13 +74,27 @@ const SchoolLive = () => {
           newSocket.emit('join_chat', { username: userFullName, user_id: userId, is_admin: isUserAdmin });
         });
 
-        newSocket.on('chat_history', (data) => { if (mounted) setWebsiteMessages(data.messages || []); });
-        newSocket.on('new_message', (message) => { if (mounted) setWebsiteMessages(prev => [...prev, message]); });
-        newSocket.on('user_joined', (data) => { if (mounted && data.count !== undefined) setOnlineCount(data.count); });
-        newSocket.on('user_left', (data) => { if (mounted && data.count !== undefined) setOnlineCount(data.count); });
-        newSocket.on('online_count', (data) => { if (mounted && data.count !== undefined) setOnlineCount(data.count); });
-        newSocket.on('message_deleted', (data) => { if (mounted) setWebsiteMessages(prev => prev.filter(m => m.id !== data.message_id)); });
-        newSocket.on('disconnect', () => { if (mounted) setChatConnected(false); });
+        newSocket.on('chat_history', (data) => { 
+          if (mounted) setWebsiteMessages(data.messages || []); 
+        });
+        newSocket.on('new_message', (message) => { 
+          if (mounted) setWebsiteMessages(prev => [...prev, message]); 
+        });
+        newSocket.on('user_joined', (data) => { 
+          if (mounted && data.count !== undefined) setOnlineCount(data.count); 
+        });
+        newSocket.on('user_left', (data) => { 
+          if (mounted && data.count !== undefined) setOnlineCount(data.count); 
+        });
+        newSocket.on('online_count', (data) => { 
+          if (mounted && data.count !== undefined) setOnlineCount(data.count); 
+        });
+        newSocket.on('message_deleted', (data) => { 
+          if (mounted) setWebsiteMessages(prev => prev.filter(m => m.id !== data.message_id)); 
+        });
+        newSocket.on('disconnect', () => { 
+          if (mounted) setChatConnected(false); 
+        });
 
         if (mounted) setSocket(newSocket);
       } catch (error) {
@@ -99,9 +115,11 @@ const SchoolLive = () => {
     if (!facebookPostId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await axios.get(`/facebook/comments?post_id=${facebookPostId}`);
-        if (res.data.comments?.length) setFacebookMessages(res.data.comments);
-      } catch (error) {}
+        const res = await apiFetch(`/facebook/comments?post_id=${facebookPostId}`);
+        if (res.comments?.length) setFacebookMessages(res.comments);
+      } catch (error) {
+        console.error('Failed to poll Facebook comments:', error);
+      }
     }, 30000);
     return () => clearInterval(interval);
   }, [facebookPostId]);
