@@ -1,4 +1,5 @@
 // craco.config.js
+const path = require("path");
 require("dotenv").config();
 
 // Environment variable overrides
@@ -28,7 +29,21 @@ let webpackConfig = {
     },
   },
   webpack: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
     configure: (webpackConfig) => {
+      // Add resolve alias to webpack config directly
+      if (!webpackConfig.resolve) {
+        webpackConfig.resolve = {};
+      }
+      if (!webpackConfig.resolve.alias) {
+        webpackConfig.resolve.alias = {};
+      }
+      
+      // Ensure @ alias is set in webpack resolve
+      webpackConfig.resolve.alias['@'] = path.resolve(__dirname, 'src');
+
       // Add ignored patterns to reduce watched directories
       webpackConfig.watchOptions = {
         ...webpackConfig.watchOptions,
