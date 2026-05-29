@@ -1,10 +1,5 @@
 // craco.config.js
-const path = require("path");
 require("dotenv").config();
-
-// Check if we're in development/preview mode (not production build)
-// Craco sets NODE_ENV=development for start, NODE_ENV=production for build
-const isDevServer = process.env.NODE_ENV !== "production";
 
 // Environment variable overrides
 const config = {
@@ -33,42 +28,7 @@ let webpackConfig = {
     },
   },
   webpack: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@api': path.resolve(__dirname, 'src/api'),
-      '@components': path.resolve(__dirname, 'src/components'),
-      '@pages': path.resolve(__dirname, 'src/pages'),
-      '@hooks': path.resolve(__dirname, 'src/hooks'),
-      '@utils': path.resolve(__dirname, 'src/utils'),
-      '@assets': path.resolve(__dirname, 'src/assets'),
-      '@styles': path.resolve(__dirname, 'src/styles'),
-      '@contexts': path.resolve(__dirname, 'src/contexts'),
-      '@services': path.resolve(__dirname, 'src/services'),
-    },
     configure: (webpackConfig) => {
-      // Add resolve alias to webpack config directly
-      if (!webpackConfig.resolve) {
-        webpackConfig.resolve = {};
-      }
-      if (!webpackConfig.resolve.alias) {
-        webpackConfig.resolve.alias = {};
-      }
-      
-      // Ensure aliases are set in webpack resolve
-      webpackConfig.resolve.alias = {
-        ...webpackConfig.resolve.alias,
-        '@': path.resolve(__dirname, 'src'),
-        '@api': path.resolve(__dirname, 'src/api'),
-        '@components': path.resolve(__dirname, 'src/components'),
-        '@pages': path.resolve(__dirname, 'src/pages'),
-        '@hooks': path.resolve(__dirname, 'src/hooks'),
-        '@utils': path.resolve(__dirname, 'src/utils'),
-        '@assets': path.resolve(__dirname, 'src/assets'),
-        '@styles': path.resolve(__dirname, 'src/styles'),
-        '@contexts': path.resolve(__dirname, 'src/contexts'),
-        '@services': path.resolve(__dirname, 'src/services'),
-      };
-
       // Add ignored patterns to reduce watched directories
       webpackConfig.watchOptions = {
         ...webpackConfig.watchOptions,
@@ -114,22 +74,6 @@ if (!webpackConfig.devServer) {
 
     return devServerConfig;
   };
-}
-
-// Wrap with visual edits (automatically adds babel plugin, dev server, and overlay in dev mode)
-if (isDevServer) {
-  try {
-    const { withVisualEdits } = require("@emergentbase/visual-edits/craco");
-    webpackConfig = withVisualEdits(webpackConfig);
-  } catch (err) {
-    if (err.code === 'MODULE_NOT_FOUND' && err.message.includes('@emergentbase/visual-edits/craco')) {
-      console.warn(
-        "[visual-edits] @emergentbase/visual-edits not installed — visual editing disabled."
-      );
-    } else {
-      throw err;
-    }
-  }
 }
 
 module.exports = webpackConfig;
