@@ -1,7 +1,7 @@
 // frontend/src/components/Header.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, BookOpen, Calendar, Home, Info, Target, Briefcase, Mail, Heart } from 'lucide-react';
+import { Menu, X, BookOpen, Calendar, Home, Info, Target, Briefcase, Mail, Heart, Radio } from 'lucide-react';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -30,6 +30,7 @@ const Header = () => {
     { path: '/about', label: 'About Us', icon: Info },
     { path: '/vision', label: 'Vision & Mission', icon: Target },
     { path: '/programs', label: 'Our Programs', icon: Briefcase },
+    { path: '/school/live', label: 'School Live', icon: Radio },
     { path: '/blog', label: 'Blog', icon: BookOpen },
     { path: '/events', label: 'Events', icon: Calendar },
     { path: '/contact', label: 'Contact', icon: Mail },
