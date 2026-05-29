@@ -1,5 +1,5 @@
 // frontend/src/utils/api.js
-const BASE_URL = process.env.REACT_APP_API_URL || 'https://heavenlynatureschools-l9e8.onrender.com';
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://api.heavenlynatureschools.com';
 
 // ─────────────────────────────────────────────
 // 🔐 TOKEN HELPERS
