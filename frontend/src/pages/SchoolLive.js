@@ -1,11 +1,11 @@
 // frontend/src/pages/SchoolLive.js
 import React, { useState, useEffect } from 'react';
 import { Facebook, ExternalLink, GraduationCap, Heart } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import axios from '@/api/axios';
+import axios from '../api/axios';
 import { io } from 'socket.io-client';
-import LiveChatPanel from '@/components/live/LiveChatPanel';
+import LiveChatPanel from '../components/live/LiveChatPanel';
 
 const FACEBOOK_PAGE = 'https://www.facebook.com/heavenlynatureministryss';
 const SCHOOL_NAME = 'Heavenly Nature Nursery & Primary School';
