@@ -35,19 +35,50 @@ let webpackConfig = {
   webpack: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@api': path.resolve(__dirname, 'src/api'),
+      '@components': path.resolve(__dirname, 'src/components'),
+      '@pages': path.resolve(__dirname, 'src/pages'),
+      '@hooks': path.resolve(__dirname, 'src/hooks'),
+      '@utils': path.resolve(__dirname, 'src/utils'),
+      '@assets': path.resolve(__dirname, 'src/assets'),
+      '@styles': path.resolve(__dirname, 'src/styles'),
+      '@contexts': path.resolve(__dirname, 'src/contexts'),
+      '@services': path.resolve(__dirname, 'src/services'),
     },
     configure: (webpackConfig) => {
+      // Add resolve alias to webpack config directly
+      if (!webpackConfig.resolve) {
+        webpackConfig.resolve = {};
+      }
+      if (!webpackConfig.resolve.alias) {
+        webpackConfig.resolve.alias = {};
+      }
+      
+      // Ensure aliases are set in webpack resolve
+      webpackConfig.resolve.alias = {
+        ...webpackConfig.resolve.alias,
+        '@': path.resolve(__dirname, 'src'),
+        '@api': path.resolve(__dirname, 'src/api'),
+        '@components': path.resolve(__dirname, 'src/components'),
+        '@pages': path.resolve(__dirname, 'src/pages'),
+        '@hooks': path.resolve(__dirname, 'src/hooks'),
+        '@utils': path.resolve(__dirname, 'src/utils'),
+        '@assets': path.resolve(__dirname, 'src/assets'),
+        '@styles': path.resolve(__dirname, 'src/styles'),
+        '@contexts': path.resolve(__dirname, 'src/contexts'),
+        '@services': path.resolve(__dirname, 'src/services'),
+      };
 
       // Add ignored patterns to reduce watched directories
-        webpackConfig.watchOptions = {
-          ...webpackConfig.watchOptions,
-          ignored: [
-            '**/node_modules/**',
-            '**/.git/**',
-            '**/build/**',
-            '**/dist/**',
-            '**/coverage/**',
-            '**/public/**',
+      webpackConfig.watchOptions = {
+        ...webpackConfig.watchOptions,
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/build/**',
+          '**/dist/**',
+          '**/coverage/**',
+          '**/public/**',
         ],
       };
 
@@ -55,31 +86,35 @@ let webpackConfig = {
       if (config.enableHealthCheck && healthPluginInstance) {
         webpackConfig.plugins.push(healthPluginInstance);
       }
+
       return webpackConfig;
     },
   },
 };
 
-webpackConfig.devServer = (devServerConfig) => {
-  // Add health check endpoints if enabled
-  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
-    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+// Only setup devServer config if it's not already present
+if (!webpackConfig.devServer) {
+  webpackConfig.devServer = (devServerConfig) => {
+    // Add health check endpoints if enabled
+    if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
+      const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
 
-    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
-      // Call original setup if exists
-      if (originalSetupMiddlewares) {
-        middlewares = originalSetupMiddlewares(middlewares, devServer);
-      }
+      devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+        // Call original setup if exists
+        if (originalSetupMiddlewares) {
+          middlewares = originalSetupMiddlewares(middlewares, devServer);
+        }
 
-      // Setup health endpoints
-      setupHealthEndpoints(devServer, healthPluginInstance);
+        // Setup health endpoints
+        setupHealthEndpoints(devServer, healthPluginInstance);
 
-      return middlewares;
-    };
-  }
+        return middlewares;
+      };
+    }
 
-  return devServerConfig;
-};
+    return devServerConfig;
+  };
+}
 
 // Wrap with visual edits (automatically adds babel plugin, dev server, and overlay in dev mode)
 if (isDevServer) {
