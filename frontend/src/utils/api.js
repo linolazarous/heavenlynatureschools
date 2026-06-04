@@ -330,6 +330,64 @@ export const adminApi = {
   }),
 
   // ─────────────────────────────────────────────
+  // 📤 IMAGE UPLOAD
+  // ─────────────────────────────────────────────
+  uploadImage: async (formData) => {
+    const token = getAccessToken();
+    
+    const response = await fetch(`${BASE_URL}/api/upload`, {
+      method: 'POST',
+      headers: {
+        // ⚠️ Do NOT set Content-Type header for FormData
+        // The browser will automatically set it with the correct boundary
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    // Handle token expiration for uploads
+    if (response.status === 401) {
+      const refreshed = await refreshTokenFunction();
+      if (refreshed) {
+        const newToken = getAccessToken();
+        const retryResponse = await fetch(`${BASE_URL}/api/upload`, {
+          method: 'POST',
+          headers: {
+            ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
+          },
+          body: formData,
+        });
+        
+        if (!retryResponse.ok) {
+          const errorData = await retryResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || errorData.detail || 'Image upload failed');
+        }
+        
+        return retryResponse.json();
+      } else {
+        clearTokens();
+        if (!window.location.pathname.includes('/admin/login')) {
+          window.location.href = '/admin/login';
+        }
+        throw new Error('Session expired. Please login again.');
+      }
+    }
+
+    if (!response.ok) {
+      let errorMessage;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.detail || 'Image upload failed';
+      } catch {
+        errorMessage = 'Image upload failed';
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  },
+
+  // ─────────────────────────────────────────────
   // ⚙️ SETTINGS
   // ─────────────────────────────────────────────
   getSettings: () => apiFetch('/api/admin/settings'),
@@ -345,7 +403,7 @@ export const adminApi = {
 };
 
 // ─────────────────────────────────────────────
-// 📤 FILE UPLOAD HELPER
+// 📤 FILE UPLOAD HELPER (Generic)
 // ─────────────────────────────────────────────
 export async function uploadFile(path, file, fieldName = 'file') {
   const token = getAccessToken();
