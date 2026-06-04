@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/AdminEvents.js
-import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Edit, Trash2, Calendar, MapPin, Clock, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Plus, Edit, Trash2, Calendar, MapPin, Clock, RefreshCw, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminApi, publicApi } from '../../utils/api';
 
@@ -13,106 +13,201 @@ const emptyForm = {
 };
 
 // ─── Event Form Component ─────────────────────────────────────────
-const EventForm = ({ formData, editingEvent, onChange, onSubmit, onCancel, isSubmitting }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg mb-8">
-    <h2 className="font-serif text-2xl font-semibold text-primary mb-6">
-      {editingEvent ? 'Edit Event' : 'Create New Event'}
-    </h2>
+const EventForm = ({ formData, editingEvent, onChange, onSubmit, onCancel, isSubmitting, onImageUpload, onImageRemove, imageUploading }) => {
+  const fileInputRef = useRef(null);
 
-    <form onSubmit={onSubmit} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Title *</label>
-        <input
-          type="text"
-          name="title"
-          value={formData.title}
-          onChange={onChange}
-          placeholder="Enter event title"
-          required
-          className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-      </div>
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      
+      onImageUpload(file);
+    }
+  };
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={onChange}
-          placeholder="Full event description"
-          required
-          rows="5"
-          className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-      </div>
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg mb-8">
+      <h2 className="font-serif text-2xl font-semibold text-primary mb-6">
+        {editingEvent ? 'Edit Event' : 'Create New Event'}
+      </h2>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Date & Time *</label>
-        <input
-          type="datetime-local"
-          name="eventDate"
-          value={formData.eventDate}
-          onChange={onChange}
-          required
-          className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-      </div>
+      <form onSubmit={onSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Title *</label>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={onChange}
+            placeholder="Enter event title"
+            required
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
-        <input
-          type="text"
-          name="location"
-          value={formData.location}
-          onChange={onChange}
-          placeholder="Event location (online or physical address)"
-          className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={onChange}
+            placeholder="Full event description"
+            required
+            rows="5"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image URL</label>
-        <input
-          type="url"
-          name="imageUrl"
-          value={formData.imageUrl}
-          onChange={onChange}
-          placeholder="https://example.com/event-image.jpg"
-          className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-        {formData.imageUrl && (
-          <div className="mt-2">
-            <img 
-              src={formData.imageUrl} 
-              alt="Preview" 
-              className="h-32 w-auto object-cover rounded-lg"
-              onError={(e) => {
-                e.target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL';
-              }}
-            />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Date & Time *</label>
+          <input
+            type="datetime-local"
+            name="eventDate"
+            value={formData.eventDate}
+            onChange={onChange}
+            required
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
+          <input
+            type="text"
+            name="location"
+            value={formData.location}
+            onChange={onChange}
+            placeholder="Event location (online or physical address)"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
+
+        {/* ─── Image Upload Section ─── */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Event Image
+          </label>
+          
+          {/* Upload Area */}
+          <div className="space-y-4">
+            {/* Drag & Drop / Click to Upload */}
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-primary cursor-pointer transition-colors"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              
+              {imageUploading ? (
+                <div className="flex flex-col items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                  <p className="text-sm text-gray-500">Uploading image...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Upload size={24} className="text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-primary font-medium">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    PNG, JPG, GIF or WebP (max. 5MB)
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Image Preview */}
+            {formData.imageUrl && (
+              <div className="relative inline-block">
+                <img 
+                  src={formData.imageUrl} 
+                  alt="Preview" 
+                  className="h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={onImageRemove}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div className="flex gap-4">
-        <button 
-          type="submit" 
-          disabled={isSubmitting}
-          className="bg-primary text-white px-6 py-2 rounded-full hover:bg-primary/90 transition disabled:opacity-50"
-        >
-          {isSubmitting ? (editingEvent ? 'Updating...' : 'Creating...') : (editingEvent ? 'Update Event' : 'Create Event')}
-        </button>
-        <button 
-          type="button" 
-          onClick={onCancel} 
-          className="border px-6 py-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  </div>
-);
+          {/* Image URL Fallback */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Or enter Image URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                name="imageUrl"
+                value={formData.imageUrl}
+                onChange={onChange}
+                placeholder="https://example.com/event-image.jpg"
+                className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              {formData.imageUrl && (
+                <button
+                  type="button"
+                  onClick={onImageRemove}
+                  className="px-3 py-2 text-gray-500 hover:text-red-500 transition"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <button 
+            type="submit" 
+            disabled={isSubmitting || imageUploading}
+            className="bg-primary text-white px-6 py-2 rounded-full hover:bg-primary/90 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                {editingEvent ? 'Updating...' : 'Creating...'}
+              </>
+            ) : (
+              editingEvent ? 'Update Event' : 'Create Event'
+            )}
+          </button>
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="border px-6 py-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
 
 // ─── Main Component ─────────────────────────────────────────
 const AdminEvents = () => {
@@ -121,6 +216,7 @@ const AdminEvents = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
 
   // ✅ Load events from MongoDB
@@ -128,7 +224,7 @@ const AdminEvents = () => {
     setLoading(true);
     try {
       const data = await publicApi.getEvents();
-      console.log('Loaded events:', data); // Debug log
+      console.log('Loaded events:', data);
       
       // Sort by event date (upcoming first)
       const sorted = [...data].sort(
@@ -153,6 +249,33 @@ const AdminEvents = () => {
     setFormData({ ...emptyForm });
     setEditingEvent(null);
     setShowForm(false);
+    setImageUploading(false);
+  };
+
+  // ✅ Handle image upload
+  const handleImageUpload = async (file) => {
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await adminApi.uploadImage(formData);
+      const imageUrl = response.url || response.imageUrl;
+      
+      setFormData(prev => ({ ...prev, imageUrl }));
+      toast.success('Image uploaded successfully! 🖼️');
+    } catch (err) {
+      console.error('Image upload error:', err);
+      toast.error(err.message || 'Failed to upload image');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  // ✅ Handle image removal
+  const handleImageRemove = () => {
+    setFormData(prev => ({ ...prev, imageUrl: '' }));
+    toast.info('Image removed');
   };
 
   // ✅ Submit (Create or Update)
@@ -309,6 +432,9 @@ const AdminEvents = () => {
                 onSubmit={handleSubmit}
                 onCancel={resetForm}
                 isSubmitting={isSubmitting}
+                onImageUpload={handleImageUpload}
+                onImageRemove={handleImageRemove}
+                imageUploading={imageUploading}
               />
             )}
 
