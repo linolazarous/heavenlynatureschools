@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, status, UploadFile, File, Form, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr
@@ -14,7 +15,10 @@ import logging
 import bcrypt
 import jwt
 import uuid
+import aiofiles
+import mimetypes
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
 # CONFIG
@@ -24,6 +28,17 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+# Upload configuration
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
+BLOG_IMAGES_DIR = UPLOAD_DIR / "blog-images"
+EVENT_IMAGES_DIR = UPLOAD_DIR / "event-images"
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+
+# Create upload directories if they don't exist
+BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────
 # DB
@@ -57,6 +72,36 @@ def serialize_admin_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
     doc["id"] = str(doc.pop("_id"))
     doc.pop("password_hash", None)
     return doc
+
+def validate_image(file: UploadFile) -> None:
+    """Validate uploaded image file type."""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File type '{file.content_type}' is not allowed. Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
+        )
+
+async def save_upload_file(file: UploadFile, directory: Path) -> str:
+    """Save uploaded file and return the URL path."""
+    # Generate unique filename to prevent collisions
+    file_ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = directory / unique_filename
+    
+    # Read file content
+    content = await file.read()
+    
+    # Check file size
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+    
+    # Save file
+    async with aiofiles.open(file_path, "wb") as f:
+        await f.write(content)
+    
+    # Return relative URL path
+    relative_path = file_path.relative_to(UPLOAD_DIR)
+    return f"/uploads/{relative_path}"
 
 # ─────────────────────────────────────────────────────────────
 # AUTH HELPERS
@@ -132,6 +177,77 @@ class CreateAdminRequest(BaseModel):
 class UpdateAdminRequest(BaseModel):
     full_name: Optional[str] = None; role: Optional[str] = None; is_active: Optional[bool] = None
     permissions: Optional[AdminPermissions] = None; password: Optional[str] = None
+
+# ─────────────────────────────────────────────────────────────
+# IMAGE UPLOAD ROUTE (NEW)
+# ─────────────────────────────────────────────────────────────
+
+@api_router.post("/upload")
+async def upload_image(
+    image: UploadFile = File(...),
+    user: dict = Depends(require_admin)
+):
+    """
+    Upload an image for blog posts or events.
+    Returns the URL to use in blog/event creation forms.
+    """
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="No image file provided")
+    
+    # Validate image type
+    validate_image(image)
+    
+    # Save to general uploads directory
+    # (You can also add a type parameter to separate blog vs event images)
+    image_url = await save_upload_file(image, BLOG_IMAGES_DIR)
+    
+    logger.info(f"Image uploaded by {user.get('email')}: {image_url}")
+    
+    return {
+        "url": image_url,
+        "imageUrl": image_url,
+        "message": "Image uploaded successfully"
+    }
+
+@api_router.post("/upload/blog-image")
+async def upload_blog_image(
+    image: UploadFile = File(...),
+    user: dict = Depends(require_admin)
+):
+    """Upload a blog-specific image."""
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="No image file provided")
+    
+    validate_image(image)
+    image_url = await save_upload_file(image, BLOG_IMAGES_DIR)
+    
+    logger.info(f"Blog image uploaded by {user.get('email')}: {image_url}")
+    
+    return {
+        "url": image_url,
+        "imageUrl": image_url,
+        "message": "Blog image uploaded successfully"
+    }
+
+@api_router.post("/upload/event-image")
+async def upload_event_image(
+    image: UploadFile = File(...),
+    user: dict = Depends(require_admin)
+):
+    """Upload an event-specific image."""
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="No image file provided")
+    
+    validate_image(image)
+    image_url = await save_upload_file(image, EVENT_IMAGES_DIR)
+    
+    logger.info(f"Event image uploaded by {user.get('email')}: {image_url}")
+    
+    return {
+        "url": image_url,
+        "imageUrl": image_url,
+        "message": "Event image uploaded successfully"
+    }
 
 # ─────────────────────────────────────────────────────────────
 # ID CARD HELPERS
@@ -374,7 +490,7 @@ async def update_profile(data: UpdateProfileRequest, user: dict = Depends(requir
     return {"message": "Profile updated"}
 
 # ─────────────────────────────────────────────────────────────
-# CONTACT, BLOG, EVENT ROUTES (unchanged, kept for brevity)
+# CONTACT, BLOG, EVENT ROUTES
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/contact")
@@ -402,6 +518,15 @@ async def delete_contact(contact_id: str, user=Depends(require_admin)):
 async def get_blog_posts():
     posts = await db.blog_posts.find({}).sort("publishDate", -1).to_list(1000); return [serialize_doc(p) for p in posts]
 
+@api_router.get("/blog/{post_id}")
+async def get_blog_post(post_id: str):
+    try:
+        post = await db.blog_posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    if not post: raise HTTPException(status_code=404, detail="Blog post not found")
+    return serialize_doc(post)
+
 @api_router.post("/admin/blog")
 async def create_blog_post(data: BlogPostCreate, user=Depends(require_admin)):
     doc = data.model_dump(); doc["createdAt"] = datetime.now(timezone.utc).isoformat(); doc["updatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -423,6 +548,15 @@ async def delete_blog_post(post_id: str, user=Depends(require_admin)):
 @api_router.get("/events")
 async def get_events():
     events = await db.events.find({}).sort("eventDate", 1).to_list(1000); return [serialize_doc(e) for e in events]
+
+@api_router.get("/events/{event_id}")
+async def get_event(event_id: str):
+    try:
+        event = await db.events.find_one({"_id": ObjectId(event_id)})
+    except:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if not event: raise HTTPException(status_code=404, detail="Event not found")
+    return serialize_doc(event)
 
 @api_router.post("/admin/events")
 async def create_event(data: EventCreate, user=Depends(require_admin)):
@@ -476,6 +610,10 @@ async def root(): return {"message": "Heavenly Nature Schools API", "version": "
 
 @app.on_event("startup")
 async def startup():
+    # Create upload directories
+    BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
@@ -485,9 +623,13 @@ async def startup():
         await db.users.update_one({"_id": existing["_id"]}, {"$set": {"role": "super_admin", "permissions": {"can_manage_admins": True, "can_manage_products": True, "can_manage_orders": True, "can_manage_users": True, "can_manage_content": True, "can_view_analytics": True, "can_manage_settings": True}, "updated_at": datetime.now(timezone.utc).isoformat()}})
     await db.contacts.create_index("createdAt"); await db.blog_posts.create_index("publishDate")
     await db.events.create_index("eventDate"); await db.users.create_index("email", unique=True)
-    logger.info("✅ School API startup complete - ID card endpoints enabled")
+    logger.info("✅ School API startup complete - Image upload enabled, ID card endpoints enabled")
 
 app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# Mount uploads directory for serving static files
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
 app.include_router(api_router)
 
 @app.get("/")
