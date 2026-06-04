@@ -1,19 +1,35 @@
 // frontend/src/pages/SchoolVerify.js
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Shield, AlertTriangle, Camera, Ban, Clock, BadgeCheck, GraduationCap, BookOpen } from 'lucide-react';
+import { Shield, AlertTriangle, Camera, Ban, BadgeCheck, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = 'https://api.heavenlynatureschools.com';
-
-// ✅ School logo path
 const SCHOOL_LOGO = '/logo.webp';
+
+// ✅ Complete Staff Roles (show "Staff ID")
+const STAFF_ROLES = [
+  'School Director', 'School Officer', 'Director of Studies', 'School Bursar',
+  'Senior Woman Teacher', 'Senior Man Teacher', 'Sports Teacher', 'Debate Teacher',
+  'Principal', 'Head Teacher', 'Teacher', 'School Coordinator',
+  'Admin', 'Accountant', 'Secretary', 'Office Staff',
+  'Caregiver', 'Social Worker', 'Security', 'Guard',
+  'Volunteer', 'Intern', 'Staff', 'Nurse', 'Librarian', 'Counselor',
+];
+
+// ✅ Complete Student Roles (show "Student ID")
+const STUDENT_ROLES = [
+  'Head Prefect', 'Assistant Head Prefect', 'Health Prefect', 'Debate Prefect',
+  'Sports Prefect', 'Class Prefect', 'Student', 'Pupil',
+  'Prefect', 'Learner',
+];
 
 const SchoolVerify = () => {
   const { id } = useParams();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     const fetchMember = async () => {
@@ -58,22 +74,30 @@ const SchoolVerify = () => {
     };
   }, [id]);
 
+  // ✅ Get full image URL with proper path handling
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    return `${API_BASE}${url}`;
+    // Ensure proper path format
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${API_BASE}${path}`;
   };
 
-  // ✅ Determine if member is a student or staff based on role
-  const isStudent = (role) => {
-    const studentRoles = ['Student', 'Pupil', 'Learner', 'Prefect'];
-    return studentRoles.some(r => role?.toLowerCase().includes(r.toLowerCase()));
+  // ✅ Check if role is a student role
+  const isStudentRole = (role) => {
+    if (!role) return false;
+    return STUDENT_ROLES.some(r => r.toLowerCase() === role.toLowerCase());
   };
 
-  // ✅ Get ID label based on role
+  // ✅ Get ID label
   const getIdLabel = (role) => {
     if (!role) return 'Staff/Student ID';
-    return isStudent(role) ? 'Student ID' : 'Staff ID';
+    return isStudentRole(role) ? 'Student ID' : 'Staff ID';
+  };
+
+  // ✅ Get badge color
+  const getRoleBadgeColor = (role) => {
+    return isStudentRole(role) ? 'bg-blue-100 text-blue-700' : 'bg-secondary/20 text-primary';
   };
 
   if (loading) {
@@ -107,6 +131,7 @@ const SchoolVerify = () => {
   const imageUrl = getImageUrl(memberData.image_url);
   const displayPhoto = photoUrl || imageUrl;
   const idLabel = getIdLabel(memberData.role);
+  const memberInitial = (memberData.name || '?').charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -122,7 +147,6 @@ const SchoolVerify = () => {
           
           {/* School Header with Logo */}
           <div className="bg-primary px-6 py-5 text-center">
-            {/* ✅ Actual School Logo */}
             <div className="inline-flex items-center justify-center mb-3">
               <img 
                 src={SCHOOL_LOGO}
@@ -130,11 +154,10 @@ const SchoolVerify = () => {
                 className="h-16 w-auto object-contain"
                 draggable="false"
                 onError={(e) => {
-                  // Fallback to graduation cap icon if logo fails to load
                   e.target.style.display = 'none';
                   e.target.parentElement.innerHTML = `
-                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-secondary/20">
-                      <svg class="h-7 w-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-white/20">
+                      <svg class="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
                         <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
                       </svg>
@@ -157,36 +180,26 @@ const SchoolVerify = () => {
           <div className="p-6">
             {/* Photo + Name */}
             <div className="flex items-center gap-4 mb-6">
+              {/* ✅ Fixed Photo Circle */}
               <div className="h-20 w-20 rounded-full overflow-hidden border-4 border-secondary flex-shrink-0 bg-secondary/10">
-                {displayPhoto ? (
+                {displayPhoto && !imgError ? (
                   <img 
                     src={displayPhoto}
-                    alt={memberData.name}
+                    alt={memberData.name || 'Member'}
                     className="w-full h-full object-cover"
                     draggable="false"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.innerHTML = `
-                        <div class="w-full h-full flex items-center justify-center bg-secondary/20 text-primary text-2xl font-bold font-serif">
-                          ${(memberData.name || '?').charAt(0).toUpperCase()}
-                        </div>
-                      `;
-                    }}
+                    onError={() => setImgError(true)}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-secondary/20 text-primary text-2xl font-bold font-serif">
-                    {(memberData.name || '?').charAt(0).toUpperCase()}
+                    {memberInitial}
                   </div>
                 )}
               </div>
               
               <div>
                 <h2 className="font-serif text-xl font-bold text-primary">{memberData.name}</h2>
-                <span className={`inline-block mt-1 px-3 py-0.5 text-xs font-semibold rounded-full ${
-                  isStudent(memberData.role) 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'bg-secondary/20 text-primary'
-                }`}>
+                <span className={`inline-block mt-1 px-3 py-0.5 text-xs font-semibold rounded-full ${getRoleBadgeColor(memberData.role)}`}>
                   {memberData.role || 'Staff'}
                 </span>
                 {memberData.role_code && (
@@ -199,7 +212,6 @@ const SchoolVerify = () => {
 
             {/* Details */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
-              {/* ✅ Dynamic ID Label: Student ID or Staff ID */}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">{idLabel}</span>
                 <span className="text-sm font-mono font-semibold text-primary">{memberData.member_id || 'N/A'}</span>
