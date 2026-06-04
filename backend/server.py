@@ -17,6 +17,7 @@ import jwt
 import uuid
 import aiofiles
 import mimetypes
+import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -33,12 +34,14 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
 BLOG_IMAGES_DIR = UPLOAD_DIR / "blog-images"
 EVENT_IMAGES_DIR = UPLOAD_DIR / "event-images"
+ID_PHOTOS_DIR = UPLOAD_DIR / "id-photos"
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # Create upload directories if they don't exist
 BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+ID_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────
 # DB
@@ -83,23 +86,18 @@ def validate_image(file: UploadFile) -> None:
 
 async def save_upload_file(file: UploadFile, directory: Path) -> str:
     """Save uploaded file and return the URL path."""
-    # Generate unique filename to prevent collisions
     file_ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = directory / unique_filename
     
-    # Read file content
     content = await file.read()
     
-    # Check file size
     if len(content) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
     
-    # Save file
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(content)
     
-    # Return relative URL path
     relative_path = file_path.relative_to(UPLOAD_DIR)
     return f"/uploads/{relative_path}"
 
@@ -179,7 +177,7 @@ class UpdateAdminRequest(BaseModel):
     permissions: Optional[AdminPermissions] = None; password: Optional[str] = None
 
 # ─────────────────────────────────────────────────────────────
-# IMAGE UPLOAD ROUTE (NEW)
+# IMAGE UPLOAD ROUTES
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/upload")
@@ -187,18 +185,10 @@ async def upload_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """
-    Upload an image for blog posts or events.
-    Returns the URL to use in blog/event creation forms.
-    """
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     
-    # Validate image type
     validate_image(image)
-    
-    # Save to general uploads directory
-    # (You can also add a type parameter to separate blog vs event images)
     image_url = await save_upload_file(image, BLOG_IMAGES_DIR)
     
     logger.info(f"Image uploaded by {user.get('email')}: {image_url}")
@@ -214,7 +204,6 @@ async def upload_blog_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """Upload a blog-specific image."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     
@@ -234,7 +223,6 @@ async def upload_event_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """Upload an event-specific image."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     
@@ -253,22 +241,80 @@ async def upload_event_image(
 # ID CARD HELPERS
 # ─────────────────────────────────────────────────────────────
 
+# ✅ Complete Role Code Mapping
 ROLE_CODE_MAP = {
-    "Principal": "ED", "Head Teacher": "ED", "Teacher": "ED", "School Coordinator": "ED",
-    "Admin": "AF", "Accountant": "AF", "Secretary": "AF", "Office Staff": "AF", "Staff": "AF",
-    "Caregiver": "CP", "Social Worker": "CP", "Security": "SP", "Guard": "SP",
-    "Volunteer": "VS", "Intern": "VS",
+    # Leadership / Administration
+    "School Director": "SD",
+    "School Officer": "SO",
+    "Director of Studies": "DS",
+    "School Bursar": "SB",
+    "Principal": "PR",
+    "Head Teacher": "HT",
+    
+    # Teaching Staff
+    "Senior Woman Teacher": "SW",
+    "Senior Man Teacher": "SM",
+    "Teacher": "ED",
+    "Sports Teacher": "ST",
+    "Debate Teacher": "DT",
+    "School Coordinator": "SC",
+    
+    # Admin / Support Staff
+    "Admin": "AD",
+    "Accountant": "AC",
+    "Secretary": "SE",
+    "Office Staff": "OS",
+    "Staff": "SF",
+    "Caregiver": "CG",
+    "Social Worker": "SWK",
+    "Nurse": "NR",
+    "Librarian": "LB",
+    "Counselor": "CL",
+    
+    # Security
+    "Security": "SP",
+    "Guard": "GD",
+    
+    # Volunteers / Interns
+    "Volunteer": "VL",
+    "Intern": "IN",
+    
+    # Student Leadership
+    "Head Prefect": "HP",
+    "Assistant Head Prefect": "AH",
+    "Health Prefect": "HL",
+    "Debate Prefect": "DP",
+    "Sports Prefect": "SPR",
+    "Class Prefect": "CP",
+    "Prefect": "PF",
+    
+    # Students
+    "Student": "STU",
+    "Pupil": "PUP",
+    "Learner": "LRN",
 }
 
 def _get_role_code(role: str) -> str:
-    return ROLE_CODE_MAP.get(role, "CM")
+    """Get the role code for ID card generation."""
+    return ROLE_CODE_MAP.get(role, "CM")  # CM = Community Member (default)
 
-def _calculate_expiry(role_code: str) -> str:
-    years = 3
+def _is_student_role(role: str) -> bool:
+    """Check if the role is a student role."""
+    student_roles = [
+        "Head Prefect", "Assistant Head Prefect", "Health Prefect", "Debate Prefect",
+        "Sports Prefect", "Class Prefect", "Prefect", "Student", "Pupil", "Learner",
+    ]
+    return role in student_roles
+
+def _calculate_expiry(role: str) -> str:
+    """Calculate expiry date based on role type."""
+    # Students: 1 year, Staff: 3 years
+    years = 1 if _is_student_role(role) else 3
     expiry = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + years)
     return expiry.strftime("%Y-%m-%d")
 
 async def _generate_member_id(db, role_code: str) -> str:
+    """Generate a unique member ID."""
     year = datetime.now(timezone.utc).strftime("%Y")
     pattern = f"HNM-{role_code}-{year}-"
     count = await db.id_cards.count_documents({"member_id": {"$regex": f"^{pattern}"}})
@@ -303,69 +349,128 @@ async def upload_id_card(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="Front ID image is required")
     
-    image_data = await image.read()
+    # Validate role exists in our mapping
+    if role not in ROLE_CODE_MAP:
+        logger.warning(f"Unknown role '{role}' - using default code 'CM'")
+    
     role_code = _get_role_code(role)
-    if not member_id: member_id = await _generate_member_id(db, role_code)
-    if not expiry_date: expiry_date = _calculate_expiry(role_code)
+    if not member_id:
+        member_id = await _generate_member_id(db, role_code)
+    if not expiry_date:
+        expiry_date = _calculate_expiry(role)
     
-    # In production, upload to S3/R2. For now, store reference
+    # Save images to disk
     file_id = str(uuid.uuid4())
-    front_id_url = f"/api/files/{file_id}"
     
+    # Save front ID image
+    front_id_url = await save_upload_file(image, ID_PHOTOS_DIR)
+    
+    # Save passport photo if provided
     passport_photo_url = None
     if photo and photo.filename:
-        photo_file_id = str(uuid.uuid4())
-        passport_photo_url = f"/api/files/{photo_file_id}"
+        passport_photo_url = await save_upload_file(photo, ID_PHOTOS_DIR)
     
     id_card = {
-        "id": file_id, "name": name.strip(), "member_id": member_id, "role_code": role_code,
-        "image_url": front_id_url, "photo_url": passport_photo_url or front_id_url,
-        "role": role, "department": department, "branch": branch,
-        "date_of_birth": date_of_birth, "gender": gender, "blood_group": blood_group, "phone": phone,
+        "id": file_id,
+        "name": name.strip(),
+        "member_id": member_id,
+        "role_code": role_code,
+        "image_url": front_id_url,
+        "photo_url": passport_photo_url or front_id_url,
+        "role": role,
+        "department": department,
+        "branch": branch,
+        "date_of_birth": date_of_birth,
+        "gender": gender,
+        "blood_group": blood_group,
+        "phone": phone,
         "member_since": member_since,
-        "emergency_contact_name": emergency_contact_name, "emergency_contact_phone": emergency_contact_phone,
+        "emergency_contact_name": emergency_contact_name,
+        "emergency_contact_phone": emergency_contact_phone,
         "emergency_contact_relation": emergency_contact_relation,
         "date_issued": date_issued or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "expiry_date": expiry_date, "is_active": is_active,
+        "expiry_date": expiry_date,
+        "is_active": is_active,
         "verify_url": f"https://heavenlynatureschools.com/verify/{file_id}",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user.get("email", "unknown"),
     }
     await db.id_cards.insert_one(id_card)
     
+    logger.info(f"ID Card created: {member_id} ({role}) by {user.get('email')}")
+    
     return {
-        "id": file_id, "name": name, "member_id": member_id, "role_code": role_code,
-        "role": role, "photo_url": passport_photo_url or front_id_url,
+        "id": file_id,
+        "name": name,
+        "member_id": member_id,
+        "role_code": role_code,
+        "role": role,
+        "photo_url": passport_photo_url or front_id_url,
         "verify_url": f"https://heavenlynatureschools.com/verify/{file_id}",
-        "expiry_date": expiry_date, "message": "ID card created successfully."
+        "expiry_date": expiry_date,
+        "message": "ID card created successfully."
     }
 
 @api_router.get("/admin/id-cards")
 async def list_id_cards(
-    search: str = Query(None), role: str = Query(None), department: str = Query(None),
-    is_active: bool = Query(None), limit: int = Query(100, le=500), skip: int = 0,
+    search: str = Query(None),
+    role: str = Query(None),
+    department: str = Query(None),
+    is_active: bool = Query(None),
+    limit: int = Query(100, le=500),
+    skip: int = 0,
     user: dict = Depends(require_admin),
 ):
     query = {}
-    if search: query["$or"] = [{"name": {"$regex": search, "$options": "i"}}, {"member_id": {"$regex": search, "$options": "i"}}]
-    if role: query["role"] = role
-    if department: query["department"] = department
-    if is_active is not None: query["is_active"] = is_active
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"member_id": {"$regex": search, "$options": "i"}}
+        ]
+    if role:
+        query["role"] = role
+    if department:
+        query["department"] = department
+    if is_active is not None:
+        query["is_active"] = is_active
+    
     cards = await db.id_cards.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    for c in cards: c.pop("_id", None)
+    for c in cards:
+        c.pop("_id", None)
+    
     total = await db.id_cards.count_documents(query)
     return {"id_cards": cards, "total": total}
 
 @api_router.delete("/admin/id-cards/{card_id}")
 async def delete_id_card(card_id: str, user: dict = Depends(require_admin)):
     result = await db.id_cards.delete_one({"id": card_id})
-    if result.deleted_count == 0: raise HTTPException(status_code=404, detail="ID card not found")
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="ID card not found")
+    logger.info(f"ID Card deleted: {card_id} by {user.get('email')}")
     return {"message": "ID card deleted"}
 
 @api_router.get("/verify/{card_id}")
 async def verify_id_card(card_id: str):
+    # Try finding by custom 'id' field first, then by MongoDB _id
     card = await db.id_cards.find_one({"id": card_id})
-    if not card: return JSONResponse(status_code=404, content={"valid": False, "message": "ID not found"})
+    
+    if not card:
+        try:
+            card = await db.id_cards.find_one({"_id": ObjectId(card_id)})
+        except:
+            pass
+    
+    if not card:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "valid": False,
+                "message": "ID not found. Please contact the school administration office."
+            }
+        )
+    
     card.pop("_id", None)
+    card.pop("created_by", None)  # Don't expose creator info
     
     is_expired = False
     expiry_date = card.get("expiry_date")
@@ -373,21 +478,59 @@ async def verify_id_card(card_id: str):
         try:
             expiry = datetime.strptime(expiry_date, "%Y-%m-%d")
             is_expired = expiry < datetime.now(timezone.utc)
-        except: expiry_date = None
+        except:
+            expiry_date = None
     
     is_active = card.get("is_active", True)
+    
     if not is_active or is_expired:
-        return {"valid": False, "message": "ID expired or inactive", "member": {"name": card.get("name"), "member_id": card.get("member_id"), "role": card.get("role"), "status": "expired" if is_expired else "inactive"}}
+        return {
+            "valid": False,
+            "message": "ID expired or inactive. Please contact the school administration office.",
+            "member": {
+                "name": card.get("name"),
+                "member_id": card.get("member_id"),
+                "role": card.get("role"),
+                "status": "expired" if is_expired else "inactive"
+            }
+        }
     
     return {
         "valid": True,
         "member": {
-            "name": card.get("name"), "member_id": card.get("member_id"), "role": card.get("role"),
-            "role_code": card.get("role_code"), "department": card.get("department"),
-            "photo_url": card.get("photo_url"), "image_url": card.get("image_url"),
-            "expiry_date": card.get("expiry_date"), "branch": card.get("branch"),
+            "name": card.get("name"),
+            "member_id": card.get("member_id"),
+            "role": card.get("role"),
+            "role_code": card.get("role_code"),
+            "department": card.get("department"),
+            "photo_url": card.get("photo_url"),
+            "image_url": card.get("image_url"),
+            "expiry_date": card.get("expiry_date"),
+            "branch": card.get("branch"),
             "verified_at": datetime.now(timezone.utc).isoformat()
         }
+    }
+
+# ✅ Available roles endpoint for frontend dropdowns
+@api_router.get("/admin/roles")
+async def get_available_roles(user: dict = Depends(require_admin)):
+    """Return all available roles for ID card creation."""
+    staff_roles = [
+        "School Director", "School Officer", "Director of Studies", "School Bursar",
+        "Principal", "Head Teacher", "Senior Woman Teacher", "Senior Man Teacher",
+        "Teacher", "Sports Teacher", "Debate Teacher", "School Coordinator",
+        "Admin", "Accountant", "Secretary", "Office Staff",
+        "Caregiver", "Social Worker", "Nurse", "Librarian", "Counselor",
+        "Security", "Guard", "Volunteer", "Intern", "Staff",
+    ]
+    student_roles = [
+        "Head Prefect", "Assistant Head Prefect", "Health Prefect", "Debate Prefect",
+        "Sports Prefect", "Class Prefect", "Prefect", "Student", "Pupil", "Learner",
+    ]
+    return {
+        "staff_roles": staff_roles,
+        "student_roles": student_roles,
+        "all_roles": staff_roles + student_roles
     }
 
 # ─────────────────────────────────────────────────────────────
@@ -579,10 +722,13 @@ async def delete_event(event_id: str, user=Depends(require_admin)):
 @api_router.get("/admin/stats")
 async def get_admin_stats(user=Depends(require_admin)):
     return {
-        "contacts": await db.contacts.count_documents({}), "unreadContacts": await db.contacts.count_documents({"read": False}),
-        "blogPosts": await db.blog_posts.count_documents({}), "events": await db.events.count_documents({}),
+        "contacts": await db.contacts.count_documents({}),
+        "unreadContacts": await db.contacts.count_documents({"read": False}),
+        "blogPosts": await db.blog_posts.count_documents({}),
+        "events": await db.events.count_documents({}),
         "upcomingEvents": await db.events.count_documents({"eventDate": {"$gte": datetime.now(timezone.utc).isoformat()}}),
-        "admins": await db.users.count_documents({"role": {"$in": ["super_admin", "admin", "moderator"]}})
+        "admins": await db.users.count_documents({"role": {"$in": ["super_admin", "admin", "moderator"]}}),
+        "idCards": await db.id_cards.count_documents({}),
     }
 
 @api_router.get("/admin/settings")
@@ -610,9 +756,9 @@ async def root(): return {"message": "Heavenly Nature Schools API", "version": "
 
 @app.on_event("startup")
 async def startup():
-    # Create upload directories
     BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    ID_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
     
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -621,15 +767,18 @@ async def startup():
         await db.users.insert_one({"email": admin_email, "password_hash": hash_password(admin_password), "role": "super_admin", "name": "Super Administrator", "phone": "", "is_active": True, "permissions": {"can_manage_admins": True, "can_manage_products": True, "can_manage_orders": True, "can_manage_users": True, "can_manage_content": True, "can_view_analytics": True, "can_manage_settings": True}, "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()})
     elif existing.get("role") != "super_admin":
         await db.users.update_one({"_id": existing["_id"]}, {"$set": {"role": "super_admin", "permissions": {"can_manage_admins": True, "can_manage_products": True, "can_manage_orders": True, "can_manage_users": True, "can_manage_content": True, "can_view_analytics": True, "can_manage_settings": True}, "updated_at": datetime.now(timezone.utc).isoformat()}})
-    await db.contacts.create_index("createdAt"); await db.blog_posts.create_index("publishDate")
-    await db.events.create_index("eventDate"); await db.users.create_index("email", unique=True)
-    logger.info("✅ School API startup complete - Image upload enabled, ID card endpoints enabled")
+    
+    await db.contacts.create_index("createdAt")
+    await db.blog_posts.create_index("publishDate")
+    await db.events.create_index("eventDate")
+    await db.users.create_index("email", unique=True)
+    await db.id_cards.create_index("id")
+    await db.id_cards.create_index("member_id")
+    
+    logger.info("✅ School API startup complete - All roles configured, Image upload enabled, ID card endpoints enabled")
 
 app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-
-# Mount uploads directory for serving static files
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-
 app.include_router(api_router)
 
 @app.get("/")
