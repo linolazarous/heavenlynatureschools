@@ -145,7 +145,7 @@ const SchoolVerify = () => {
             </div>
             <h2 className="font-serif text-lg font-semibold text-white">Heavenly Nature</h2>
             <p className="text-secondary text-sm font-medium">Nursery &amp; Primary School</p>
-            <p className="text-white/60 text-xs mt-1">Nurturing Right Leaders — Juba, South Sudan</p>
+            <p className="text-white/60 text-xs mt-1">"Nurturing Right Leaders"</p>
           </div>
 
           {/* Verified Badge */}
