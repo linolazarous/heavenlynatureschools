@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 
 const API_BASE = 'https://api.heavenlynatureschools.com';
 
+// ✅ School logo path
+const SCHOOL_LOGO = '/logo.webp';
+
 const SchoolVerify = () => {
   const { id } = useParams();
   const [member, setMember] = useState(null);
@@ -61,6 +64,18 @@ const SchoolVerify = () => {
     return `${API_BASE}${url}`;
   };
 
+  // ✅ Determine if member is a student or staff based on role
+  const isStudent = (role) => {
+    const studentRoles = ['Student', 'Pupil', 'Learner', 'Prefect'];
+    return studentRoles.some(r => role?.toLowerCase().includes(r.toLowerCase()));
+  };
+
+  // ✅ Get ID label based on role
+  const getIdLabel = (role) => {
+    if (!role) return 'Staff/Student ID';
+    return isStudent(role) ? 'Student ID' : 'Staff ID';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -91,6 +106,7 @@ const SchoolVerify = () => {
   const photoUrl = getImageUrl(memberData.photo_url);
   const imageUrl = getImageUrl(memberData.image_url);
   const displayPhoto = photoUrl || imageUrl;
+  const idLabel = getIdLabel(memberData.role);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -104,10 +120,28 @@ const SchoolVerify = () => {
         {/* Verification Card */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-primary/5" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
           
-          {/* School Header */}
+          {/* School Header with Logo */}
           <div className="bg-primary px-6 py-5 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-secondary/20 mb-3">
-              <GraduationCap className="h-7 w-7 text-secondary" />
+            {/* ✅ Actual School Logo */}
+            <div className="inline-flex items-center justify-center mb-3">
+              <img 
+                src={SCHOOL_LOGO}
+                alt="Heavenly Nature Schools Logo"
+                className="h-16 w-auto object-contain"
+                draggable="false"
+                onError={(e) => {
+                  // Fallback to graduation cap icon if logo fails to load
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = `
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-secondary/20">
+                      <svg class="h-7 w-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                        <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                      </svg>
+                    </div>
+                  `;
+                }}
+              />
             </div>
             <h2 className="font-serif text-lg font-semibold text-white">Heavenly Nature</h2>
             <p className="text-secondary text-sm font-medium">Nursery &amp; Primary School</p>
@@ -148,7 +182,11 @@ const SchoolVerify = () => {
               
               <div>
                 <h2 className="font-serif text-xl font-bold text-primary">{memberData.name}</h2>
-                <span className="inline-block mt-1 px-3 py-0.5 bg-secondary/20 text-primary text-xs font-semibold rounded-full">
+                <span className={`inline-block mt-1 px-3 py-0.5 text-xs font-semibold rounded-full ${
+                  isStudent(memberData.role) 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-secondary/20 text-primary'
+                }`}>
                   {memberData.role || 'Staff'}
                 </span>
                 {memberData.role_code && (
@@ -161,8 +199,9 @@ const SchoolVerify = () => {
 
             {/* Details */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
+              {/* ✅ Dynamic ID Label: Student ID or Staff ID */}
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Staff/Student ID</span>
+                <span className="text-sm text-muted-foreground">{idLabel}</span>
                 <span className="text-sm font-mono font-semibold text-primary">{memberData.member_id || 'N/A'}</span>
               </div>
               {memberData.department && (
