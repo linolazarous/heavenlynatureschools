@@ -1,10 +1,7 @@
 // frontend/src/pages/SchoolLive.js
-import React, { useState, useEffect } from 'react';
-import { Facebook, ExternalLink, GraduationCap, Heart } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Facebook, ExternalLink, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiFetch } from '../utils/api';
-import { io } from 'socket.io-client';
 import LiveChatPanel from '../components/live/LiveChatPanel';
 
 const FACEBOOK_PAGE = 'https://www.facebook.com/heavenlynatureministryss';
@@ -12,130 +9,181 @@ const SCHOOL_NAME = 'Heavenly Nature Nursery & Primary School';
 const SCHOOL_MISSION = 'Nurturing Right Leaders — Juba City, South Sudan';
 
 const SchoolLive = () => {
-  const { user } = useAuth();
   const [websiteMessages, setWebsiteMessages] = useState([]);
   const [facebookMessages, setFacebookMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineCount, setOnlineCount] = useState(0);
-  const [socket, setSocket] = useState(null);
   const [chatConnected, setChatConnected] = useState(false);
   const [facebookPostId, setFacebookPostId] = useState(null);
+  const [user, setUser] = useState(null);
+  const messagesEndRef = useRef(null);
+  const socketRef = useRef(null);
 
-  const userFullName = user?.full_name || 'Guest';
-  const userId = user?.id || 'guest_' + Date.now();
-  const userRole = user?.role || 'user';
-  const isUserAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'moderator';
+  // ✅ Safe user loading - works without AuthContext
+  useEffect(() => {
+    try {
+      // Try multiple sources for user info
+      const adminInfo = localStorage.getItem('admin_info');
+      const userStr = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+      
+      if (adminInfo) {
+        setUser(JSON.parse(adminInfo));
+      } else if (userStr) {
+        setUser(JSON.parse(userStr));
+      } else if (token) {
+        // Decode JWT for user info
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          setUser({
+            id: payload.sub,
+            email: payload.email,
+            role: payload.role || 'user',
+            full_name: payload.name || 'User',
+            name: payload.name || 'User',
+          });
+        } catch {
+          setUser({ full_name: 'Guest', role: 'user' });
+        }
+      } else {
+        setUser({ full_name: 'Guest', role: 'user' });
+      }
+    } catch (err) {
+      console.error('Failed to load user:', err);
+      setUser({ full_name: 'Guest', role: 'user' });
+    }
+  }, []);
 
-  const allMessages = [...websiteMessages, ...facebookMessages]
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const isUserAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'moderator';
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [websiteMessages, facebookMessages]);
 
   // Load Facebook SDK
   useEffect(() => {
     if (document.getElementById('facebook-jssdk')) return;
-    const script = document.createElement('script');
-    script.id = 'facebook-jssdk';
-    script.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0';
-    script.async = true;
-    script.defer = true;
-    script.crossOrigin = 'anonymous';
-    document.body.appendChild(script);
+    try {
+      const script = document.createElement('script');
+      script.id = 'facebook-jssdk';
+      script.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0';
+      script.async = true;
+      script.defer = true;
+      script.crossOrigin = 'anonymous';
+      document.body.appendChild(script);
+    } catch (err) {
+      console.error('Failed to load Facebook SDK:', err);
+    }
   }, []);
 
-  // Connect to chat
+  // ✅ Safe socket connection with dynamic import
   useEffect(() => {
     let mounted = true;
-    let newSocket = null;
 
-    const getFacebookInfo = async () => {
+    const connectSocket = async () => {
       try {
-        const res = await apiFetch('/facebook/comments');
-        if (mounted && res.post_id) {
-          setFacebookPostId(res.post_id);
-          setFacebookMessages(res.comments || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch Facebook comments:', error);
-      }
-    };
-    getFacebookInfo();
-
-    const connectSocket = () => {
-      try {
+        const { io } = await import('socket.io-client');
+        
         const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.heavenlynatureschools.com';
-        newSocket = io(API_URL, { 
+        const socket = io(API_URL, { 
           transports: ['websocket', 'polling'],
           reconnection: true,
           reconnectionAttempts: 5,
+          timeout: 10000,
         });
 
-        newSocket.on('connect', () => {
+        socket.on('connect', () => {
           if (!mounted) return;
           setChatConnected(true);
-          newSocket.emit('join_chat', { username: userFullName, user_id: userId, is_admin: isUserAdmin });
+          socket.emit('join_chat', { 
+            username: user?.full_name || 'Guest', 
+            user_id: user?.id || 'guest_' + Date.now(), 
+            is_admin: isUserAdmin 
+          });
         });
 
-        newSocket.on('chat_history', (data) => { 
+        socket.on('chat_history', (data) => { 
           if (mounted) setWebsiteMessages(data.messages || []); 
         });
-        newSocket.on('new_message', (message) => { 
+        
+        socket.on('new_message', (message) => { 
           if (mounted) setWebsiteMessages(prev => [...prev, message]); 
         });
-        newSocket.on('user_joined', (data) => { 
+        
+        socket.on('online_count', (data) => { 
           if (mounted && data.count !== undefined) setOnlineCount(data.count); 
         });
-        newSocket.on('user_left', (data) => { 
-          if (mounted && data.count !== undefined) setOnlineCount(data.count); 
-        });
-        newSocket.on('online_count', (data) => { 
-          if (mounted && data.count !== undefined) setOnlineCount(data.count); 
-        });
-        newSocket.on('message_deleted', (data) => { 
+        
+        socket.on('message_deleted', (data) => { 
           if (mounted) setWebsiteMessages(prev => prev.filter(m => m.id !== data.message_id)); 
         });
-        newSocket.on('disconnect', () => { 
+        
+        socket.on('disconnect', () => { 
           if (mounted) setChatConnected(false); 
         });
 
-        if (mounted) setSocket(newSocket);
-      } catch (error) {
-        console.error('Chat socket initialization failed:', error);
+        socket.on('connect_error', (err) => {
+          console.warn('Socket connection failed:', err.message);
+          if (mounted) setChatConnected(false);
+        });
+
+        if (mounted) socketRef.current = socket;
+      } catch (err) {
+        console.warn('Socket.io not available - chat will work in offline mode');
+        if (mounted) setChatConnected(false);
       }
     };
 
-    connectSocket();
+    // Delay connection until user is loaded
+    const timeout = setTimeout(connectSocket, 500);
 
     return () => {
       mounted = false;
-      if (newSocket) newSocket.close();
-    };
-  }, [userId, userFullName, isUserAdmin]);
-
-  // Poll Facebook comments
-  useEffect(() => {
-    if (!facebookPostId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiFetch(`/facebook/comments?post_id=${facebookPostId}`);
-        if (res.comments?.length) setFacebookMessages(res.comments);
-      } catch (error) {
-        console.error('Failed to poll Facebook comments:', error);
+      clearTimeout(timeout);
+      if (socketRef.current) {
+        socketRef.current.off('connect');
+        socketRef.current.off('disconnect');
+        socketRef.current.close();
       }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [facebookPostId]);
+    };
+  }, [user?.full_name, isUserAdmin]);
 
-  const handleSendMessage = (e) => {
+  const allMessages = [...websiteMessages, ...facebookMessages]
+    .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+  const handleSendMessage = useCallback((e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket || !chatConnected) return;
-    socket.emit('send_message', { message: newMessage.trim() });
-    setNewMessage('');
-  };
+    if (!newMessage.trim()) return;
+    
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('send_message', { message: newMessage.trim() });
+      setNewMessage('');
+    } else {
+      // Offline mode
+      const localMsg = {
+        id: 'local_' + Date.now(),
+        username: user?.full_name || 'Guest',
+        message: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        is_admin: isUserAdmin,
+      };
+      setWebsiteMessages(prev => [...prev, localMsg]);
+      setNewMessage('');
+      toast.info('Message sent (offline mode)');
+    }
+  }, [newMessage, user, isUserAdmin]);
 
-  const handleDeleteMessage = (messageId) => {
-    if (!socket || !chatConnected || !isUserAdmin) return;
-    socket.emit('delete_message', { message_id: messageId });
-    toast.success('Message deleted');
-  };
+  const handleDeleteMessage = useCallback((messageId) => {
+    if (!isUserAdmin) return;
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('delete_message', { message_id: messageId });
+      toast.success('Message deleted');
+    } else {
+      setWebsiteMessages(prev => prev.filter(m => m.id !== messageId));
+      toast.success('Message removed');
+    }
+  }, [isUserAdmin]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -155,21 +203,26 @@ const SchoolLive = () => {
           <p className="text-lg text-white/70 italic max-w-2xl mx-auto">
             {SCHOOL_MISSION}
           </p>
-          <p className="text-white/60 text-sm mt-4">
-            Join us for school events, assemblies, and special programs
-          </p>
+          <div className="mt-4">
+            <span className={`inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full ${
+              chatConnected ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${chatConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></span>
+              {chatConnected ? 'Live Chat Active' : 'Offline Mode'}
+            </span>
+          </div>
         </div>
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Facebook Live + Page */}
+          {/* Left Column - Facebook */}
           <div className="lg:col-span-2">
             {/* Live Video */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-primary/5 mb-8">
-              <div className="aspect-video bg-black">
+              <div className="aspect-video bg-black relative">
                 <div 
-                  className="fb-video"
+                  className="fb-video absolute inset-0"
                   data-href={`${FACEBOOK_PAGE}/live`}
                   data-width="100%"
                   data-allowfullscreen="true"
@@ -177,27 +230,23 @@ const SchoolLive = () => {
                   data-show-text="false"
                   data-show-captions="false"
                 />
-                
-                {/* Offline Fallback */}
-                <div className="w-full h-full flex flex-col items-center justify-center bg-primary/5 p-8" id="fb-fallback">
+                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10 p-8 -z-10">
                   <div className="w-24 h-24 rounded-full bg-secondary/20 flex items-center justify-center mb-6">
                     <GraduationCap className="h-12 w-12 text-secondary" />
                   </div>
-                  <h2 className="font-serif text-2xl font-semibold text-primary mb-2">No Live Stream</h2>
-                  <p className="text-muted-foreground mb-4">Check back during school events</p>
+                  <h2 className="font-serif text-2xl font-semibold text-primary mb-2">Live Stream</h2>
+                  <p className="text-muted-foreground mb-4 text-center">Live videos appear here during school events</p>
                   <a 
                     href={FACEBOOK_PAGE}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-secondary text-primary hover:bg-secondary/90 rounded-full px-6 py-3 font-medium transition-colors"
+                    className="inline-flex items-center gap-2 bg-primary text-white hover:bg-primary/90 rounded-full px-6 py-3 font-medium transition-colors"
                   >
                     <Facebook className="h-5 w-5" />
-                    Visit Our Facebook
+                    Watch on Facebook
                   </a>
                 </div>
               </div>
-
-              {/* Watch on Facebook Button */}
               <div className="p-4 bg-primary/5 flex justify-center border-t border-primary/5">
                 <a 
                   href={FACEBOOK_PAGE}
@@ -206,14 +255,15 @@ const SchoolLive = () => {
                   className="inline-flex items-center gap-2 bg-primary text-white hover:bg-primary/90 rounded-full px-6 py-3 font-medium transition-colors"
                 >
                   <Facebook className="h-5 w-5" />
-                  Watch on Facebook
+                  Visit Our Facebook Page
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
             </div>
 
             {/* Facebook Page Plugin */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-primary/5 p-4">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-primary/5 p-4 mb-8">
+              <h3 className="font-semibold text-primary mb-3 px-2">📱 Facebook Updates</h3>
               <div 
                 className="fb-page"
                 data-href={FACEBOOK_PAGE}
@@ -231,13 +281,12 @@ const SchoolLive = () => {
               </div>
             </div>
 
-            {/* School Info Card */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-primary/5 mt-8">
+            {/* School Info */}
+            <div className="bg-white rounded-2xl shadow-lg p-8 border border-primary/5">
               <h3 className="font-serif text-2xl font-semibold text-primary mb-4">About Our School</h3>
               <p className="text-muted-foreground leading-relaxed mb-6">
                 {SCHOOL_NAME} provides free, faith-based education to street children, 
-                abandoned children, and orphans in Juba City, South Sudan. We nurture 
-                right leaders through quality education rooted in Christian values.
+                abandoned children, and orphans in Juba City, South Sudan.
               </p>
               <div className="flex flex-wrap gap-3">
                 {['📚 Quality Education', '🙏 Christian Values', '💙 Free Tuition', '🌟 Leadership'].map(tag => (
@@ -250,19 +299,16 @@ const SchoolLive = () => {
           </div>
 
           {/* Live Chat */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24">
-              <LiveChatPanel 
-                messages={allMessages} 
-                newMessage={newMessage} 
-                onMessageChange={(val) => setNewMessage(val)} 
-                onSendMessage={handleSendMessage} 
-                onDeleteMessage={handleDeleteMessage} 
-                onlineCount={onlineCount} 
-                user={user} 
-              />
-            </div>
-          </div>
+          <LiveChatPanel 
+            messages={allMessages} 
+            newMessage={newMessage} 
+            onMessageChange={setNewMessage} 
+            onSendMessage={handleSendMessage} 
+            onDeleteMessage={handleDeleteMessage} 
+            onlineCount={onlineCount} 
+            user={user}
+            messagesEndRef={messagesEndRef}
+          />
         </div>
       </div>
     </div>
