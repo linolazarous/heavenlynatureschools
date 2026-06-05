@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/AdminDashboard.js
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   Mail, FileText, Calendar, Users, Eye, TrendingUp,
   Bell, RefreshCw, Settings, School, MessageCircle,
@@ -14,6 +14,8 @@ import AdminVerification from './AdminVerification';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const location = useLocation();
+
   const [stats, setStats] = useState({ 
     contacts: 0, unreadContacts: 0, blogPosts: 0, events: 0,
     upcomingEvents: 0, admins: 0, idCards: 0, verifications: 0,
@@ -37,10 +39,25 @@ const AdminDashboard = () => {
     facebook: 'https://www.facebook.com/share/1CPEyYC14f/', twitter: '', instagram: '', linkedin: ''
   });
 
+  // ✅ Initialize super admin check
   useEffect(() => {
     const adminInfo = adminApi.getCurrentAdmin();
     setIsSuperAdmin(adminInfo?.role === 'super_admin');
   }, []);
+
+  // ✅ Sync active tab from URL path
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('/admin/id-cards')) {
+      setActiveTab('id-cards');
+    } else if (path.includes('/admin/verifications')) {
+      setActiveTab('verifications');
+    } else if (path.includes('/admin/chat')) {
+      setActiveTab('chat');
+    } else {
+      setActiveTab('dashboard');
+    }
+  }, [location.pathname]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -136,16 +153,19 @@ const AdminDashboard = () => {
     return `${diffDays}d ago`;
   };
 
+  // ✅ Tab component mapping
   const TAB_COMPONENTS = { 
     dashboard: null, 
     'id-cards': AdminIDCard,
     'verifications': AdminVerification,
+    'chat': ChatTab, // Inline chat stats component
   };
 
   const getTabTitle = () => {
     switch (activeTab) {
       case 'id-cards': return 'School ID Cards';
       case 'verifications': return 'Verification QR Codes';
+      case 'chat': return 'Live Chat Monitor';
       default: return `Welcome back, ${user?.name || user?.email?.split('@')[0] || 'Admin'}! 👋`;
     }
   };
@@ -154,6 +174,7 @@ const AdminDashboard = () => {
     switch (activeTab) {
       case 'id-cards': return 'Create and manage staff/student identification cards';
       case 'verifications': return 'Generate QR codes for Academic Report Cards and Nursery Certificates';
+      case 'chat': return 'Monitor and moderate school live chat messages';
       default: return "Here's what's happening with your school today.";
     }
   };
@@ -244,8 +265,16 @@ const AdminDashboard = () => {
 
             {/* Chat Messages */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-              <div className="bg-pink-100 dark:bg-pink-900/30 p-3 rounded-xl mb-3">
-                <MessageCircle size={24} className="text-pink-600 dark:text-pink-400" />
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-pink-100 dark:bg-pink-900/30 p-3 rounded-xl">
+                  <MessageCircle size={24} className="text-pink-600 dark:text-pink-400" />
+                </div>
+                <button 
+                  onClick={() => setActiveTab('chat')} 
+                  className="text-xs text-pink-600 hover:underline"
+                >
+                  View
+                </button>
               </div>
               <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
                 {loading ? '...' : stats.chatMessages || 0}
@@ -304,9 +333,8 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Quick Actions */}
+          {/* Quick Actions Row 1 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Manage Blog */}
             <Link to="/admin/blog" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
               <div className="bg-green-100 dark:bg-green-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                 <FileText size={32} className="text-green-600 dark:text-green-400" />
@@ -315,7 +343,6 @@ const AdminDashboard = () => {
               <p className="text-gray-500 dark:text-gray-400 text-sm">Create and edit posts</p>
             </Link>
 
-            {/* Manage Events */}
             <Link to="/admin/events" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
               <div className="bg-purple-100 dark:bg-purple-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                 <Calendar size={32} className="text-purple-600 dark:text-purple-400" />
@@ -324,7 +351,6 @@ const AdminDashboard = () => {
               <p className="text-gray-500 dark:text-gray-400 text-sm">Schedule and manage events</p>
             </Link>
 
-            {/* View Contacts */}
             <Link to="/admin/contacts" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center">
               <div className="bg-blue-100 dark:bg-blue-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                 <Mail size={32} className="text-blue-600 dark:text-blue-400" />
@@ -333,7 +359,6 @@ const AdminDashboard = () => {
               <p className="text-gray-500 dark:text-gray-400 text-sm">Read messages</p>
             </Link>
 
-            {/* Settings / Admin Management */}
             {isSuperAdmin ? (
               <Link to="/admin/manage-admins" className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center border-2 border-purple-200 dark:border-purple-800">
                 <div className="bg-purple-100 dark:bg-purple-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
@@ -353,9 +378,8 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Secondary Quick Actions */}
+          {/* Quick Actions Row 2 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            {/* School ID Cards */}
             <button 
               onClick={() => setActiveTab('id-cards')} 
               className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center border-2 border-amber-200 dark:border-amber-800"
@@ -367,7 +391,6 @@ const AdminDashboard = () => {
               <p className="text-gray-500 dark:text-gray-400 text-sm">Create and manage staff/student IDs</p>
             </button>
 
-            {/* Verification QR Codes */}
             <button 
               onClick={() => setActiveTab('verifications')} 
               className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center border-2 border-teal-200 dark:border-teal-800"
@@ -379,9 +402,8 @@ const AdminDashboard = () => {
               <p className="text-gray-500 dark:text-gray-400 text-sm">Report Cards & Certificates</p>
             </button>
 
-            {/* Live Chat */}
-            <Link 
-              to="/admin/chat" 
+            <button 
+              onClick={() => setActiveTab('chat')} 
               className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group text-center border-2 border-pink-200 dark:border-pink-800"
             >
               <div className="bg-pink-100 dark:bg-pink-900/30 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
@@ -389,7 +411,7 @@ const AdminDashboard = () => {
               </div>
               <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Live Chat</h3>
               <p className="text-gray-500 dark:text-gray-400 text-sm">Monitor school chat</p>
-            </Link>
+            </button>
           </div>
         </>
       );
@@ -407,7 +429,10 @@ const AdminDashboard = () => {
             <div className="flex items-center gap-4">
               {activeTab !== 'dashboard' && (
                 <button 
-                  onClick={() => setActiveTab('dashboard')} 
+                  onClick={() => {
+                    setActiveTab('dashboard');
+                    window.history.pushState({}, '', '/admin');
+                  }} 
                   className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
                   title="Back to Dashboard"
                 >
@@ -525,6 +550,82 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ✅ Inline Chat Tab Component (simple stats view for admin)
+const ChatTab = () => {
+  const [chatStats, setChatStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchChatStats = async () => {
+      try {
+        const data = await apiFetch('/api/live-chat/stats');
+        setChatStats(data);
+      } catch (err) {
+        console.error('Failed to load chat stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchChatStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center py-20">
+        <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+        <p className="text-gray-500">Loading chat stats...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+          <div className="bg-pink-100 dark:bg-pink-900/30 p-3 rounded-xl mb-3 inline-block">
+            <MessageCircle size={24} className="text-pink-600" />
+          </div>
+          <h3 className="text-2xl font-bold">{chatStats?.total_messages || 0}</h3>
+          <p className="text-gray-500 text-sm">Total Messages</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+          <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-xl mb-3 inline-block">
+            <MessageCircle size={24} className="text-green-600" />
+          </div>
+          <h3 className="text-2xl font-bold">{chatStats?.today_messages || 0}</h3>
+          <p className="text-gray-500 text-sm">Today's Messages</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+          <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-xl mb-3 inline-block">
+            <Users size={24} className="text-blue-600" />
+          </div>
+          <h3 className="text-2xl font-bold">{chatStats?.online_now || 0}</h3>
+          <p className="text-gray-500 text-sm">Online Now</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+          <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-xl mb-3 inline-block">
+            <Users size={24} className="text-purple-600" />
+          </div>
+          <h3 className="text-2xl font-bold">{chatStats?.unique_users_today || 0}</h3>
+          <p className="text-gray-500 text-sm">Unique Users Today</p>
+        </div>
+      </div>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg text-center">
+        <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+        <p className="text-gray-500">Live chat is active on the School Live Stream page.</p>
+        <a 
+          href="/school/live" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-block mt-4 text-primary hover:underline"
+        >
+          Open School Live Page →
+        </a>
+      </div>
     </div>
   );
 };
