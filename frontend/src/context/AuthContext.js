@@ -3,10 +3,10 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 const AuthContext = createContext(null);
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'https://heavenlynatureschools-l9e8.onrender.com';
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://api.heavenlynatureschools.com';
 
 // ─────────────────────────────────────────────
-// 🔧 TOKEN HELPERS (Synchronized with api.js)
+// 🔧 TOKEN HELPERS
 // ─────────────────────────────────────────────
 export const getAccessToken = () => localStorage.getItem('access_token');
 export const getRefreshToken = () => localStorage.getItem('refresh_token');
@@ -20,6 +20,7 @@ export const clearTokens = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('admin_info');
 };
 
 // 🔄 Refresh token function
@@ -29,7 +30,6 @@ export const refreshToken = async () => {
   const refresh = getRefreshToken();
   if (!refresh) return false;
 
-  // Prevent multiple concurrent refresh requests
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -58,7 +58,7 @@ export const refreshToken = async () => {
   return refreshPromise;
 };
 
-// 🔐 Main API function (syncs with api.js)
+// 🔐 Main API function
 async function apiFetch(path, options = {}) {
   let token = getAccessToken();
 
@@ -75,7 +75,6 @@ async function apiFetch(path, options = {}) {
 
   let res = await makeRequest(token);
 
-  // 🔄 Auto refresh if expired
   if (res.status === 401) {
     const refreshed = await refreshToken();
 
@@ -105,37 +104,53 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // ✅ Initialize user from token
+  // ✅ Initialize user from localStorage
   const checkAuth = useCallback(async () => {
     try {
       const token = getAccessToken();
       if (!token) {
-        setUser(null);
+        // Check localStorage for user info even without token (for public pages)
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          try {
+            const userData = JSON.parse(userStr);
+            setUser(userData);
+          } catch {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
         setIsAuthenticated(false);
+        setIsLoading(false);
         return;
       }
 
-      // Decode JWT payload (basic client-side check)
+      // Decode JWT payload
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
+        const exp = payload.exp * 1000;
         
-        // Check if token is expired
-        const exp = payload.exp * 1000; // Convert to milliseconds
         if (Date.now() >= exp) {
           console.warn('Token expired');
           clearTokens();
           setUser(null);
           setIsAuthenticated(false);
+          setIsLoading(false);
           return;
         }
 
-        setUser({
+        const userData = {
           id: payload.sub || payload.id,
           email: payload.email,
-          role: payload.role || 'admin',
-          name: payload.name,
-        });
+          role: payload.role || 'user',
+          name: payload.name || payload.email?.split('@')[0],
+          full_name: payload.name || payload.email?.split('@')[0],
+        };
+
+        setUser(userData);
         setIsAuthenticated(true);
+        localStorage.setItem('user', JSON.stringify(userData));
       } catch (decodeError) {
         console.error('Token decode failed:', decodeError);
         clearTokens();
@@ -144,7 +159,6 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Auth check failed:', err);
-      clearTokens();
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -159,7 +173,6 @@ export const AuthProvider = ({ children }) => {
   // 🔐 LOGIN
   const login = useCallback(async (email, password) => {
     try {
-      // Use the existing login endpoint
       const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,19 +189,17 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No access token received');
       }
 
-      // Store tokens
       setTokens(data.access_token, data.refresh_token);
 
-      // Store user info
       const userData = {
-        email: data.email || email,
-        role: data.role || 'admin',
-        name: data.name || email.split('@')[0],
+        email: data.user?.email || email,
+        role: data.user?.role || 'admin',
+        name: data.user?.name || email.split('@')[0],
+        full_name: data.user?.name || email.split('@')[0],
       };
       
       localStorage.setItem('user', JSON.stringify(userData));
       
-      // Set user state
       setUser(userData);
       setIsAuthenticated(true);
 
@@ -197,12 +208,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       throw error;
     }
-  }, []); // No dependencies needed as it only uses BASE_URL which is constant
+  }, []);
 
   // 🔓 LOGOUT
   const logout = useCallback(async () => {
     try {
-      // Optional: Call logout endpoint if exists
       const token = getAccessToken();
       if (token) {
         try {
@@ -222,16 +232,16 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       window.location.href = '/admin/login';
     }
-  }, []); // No dependencies needed
+  }, []);
 
-  // ✅ Update user profile (if needed)
+  // ✅ Update user profile
   const updateUser = useCallback((updates) => {
     setUser(prevUser => {
       const updatedUser = { ...prevUser, ...updates };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       return updatedUser;
     });
-  }, []); // No dependencies needed
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -241,11 +251,11 @@ export const AuthProvider = ({ children }) => {
       updateUser,
       isLoading,
       isAuthenticated,
-      apiFetch, // 🔥 expose for global use
+      apiFetch,
       getAccessToken,
       refreshToken,
     }),
-    [user, isLoading, isAuthenticated, login, logout, updateUser] // Added missing dependencies
+    [user, isLoading, isAuthenticated, login, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -254,11 +264,37 @@ export const AuthProvider = ({ children }) => {
 // ─────────────────────────────────────────────
 // 🎣 CUSTOM HOOKS
 // ─────────────────────────────────────────────
+
+// ✅ SAFE useAuth - returns null instead of throwing error
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  
+  // Return default guest state if used outside AuthProvider
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.warn('useAuth used outside AuthProvider - returning guest user');
+    return {
+      user: null,
+      login: () => Promise.reject(new Error('Auth not available')),
+      logout: () => {},
+      updateUser: () => {},
+      isLoading: false,
+      isAuthenticated: false,
+      apiFetch: async (path, options) => {
+        const res = await fetch(`${BASE_URL}${path}`, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options?.headers || {}),
+          },
+        });
+        if (!res.ok) throw new Error('Request failed');
+        return res.json();
+      },
+      getAccessToken: () => null,
+      refreshToken: () => Promise.resolve(false),
+    };
   }
+  
   return context;
 };
 
@@ -278,7 +314,7 @@ export const useRequireAuth = () => {
 // ✅ Admin check hook
 export const useIsAdmin = () => {
   const { user } = useAuth();
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.role === 'super_admin';
 };
 
 export default AuthContext;
