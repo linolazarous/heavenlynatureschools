@@ -512,7 +512,17 @@ async def get_available_roles(user: dict = Depends(require_admin)):
     return {"staff_roles": staff_roles, "student_roles": student_roles, "all_roles": staff_roles + student_roles}
 
 # ─────────────────────────────────────────────────────────────
-# DOCUMENT VERIFICATION ROUTES (NEW)
+# DOCUMENT VERIFICATION MODELS (Update this model)
+# ─────────────────────────────────────────────────────────────
+
+class GenerateVerificationRequest(BaseModel):
+    type: str  # "report_card" or "certificate"
+    year: str
+    count: Optional[int] = 0
+    custom_date: Optional[str] = None  # ✅ NEW: Custom creation date
+
+# ─────────────────────────────────────────────────────────────
+# DOCUMENT VERIFICATION ROUTES
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/admin/verifications/generate")
@@ -521,7 +531,7 @@ async def generate_verification(
     user: dict = Depends(require_admin)
 ):
     """
-    Generate a verification QR code for documents.
+    Generate a verification link for documents.
     Types: 'report_card' or 'certificate'
     """
     if data.type not in ["report_card", "certificate"]:
@@ -535,6 +545,23 @@ async def generate_verification(
             status_code=400,
             detail="Year must be a valid 4-digit year (e.g., 2026)"
         )
+
+    # ✅ Parse custom date or use current time
+    custom_created_at = datetime.now(timezone.utc)
+    if data.custom_date:
+        try:
+            custom_created_at = datetime.strptime(data.custom_date, "%Y-%m-%d")
+            custom_created_at = custom_created_at.replace(
+                hour=datetime.now(timezone.utc).hour,
+                minute=datetime.now(timezone.utc).minute,
+                second=datetime.now(timezone.utc).second,
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid date format. Use YYYY-MM-DD"
+            )
 
     # Check if verification already exists for this type and year
     existing = await db.document_verifications.find_one({
@@ -566,7 +593,7 @@ async def generate_verification(
         "is_active": True,
         "verify_url": f"https://heavenlynatureschools.com/verify/{verify_id}",
         "created_by": user.get("email", "unknown"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": custom_created_at.isoformat(),  # ✅ Use custom date
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -630,8 +657,8 @@ async def delete_verification(verify_id: str, user: dict = Depends(require_admin
 @api_router.get("/verify/document/{verify_id}")
 async def verify_document(verify_id: str):
     """
-    Public endpoint to verify a document by QR code ID.
-    This is the endpoint that QR codes link to.
+    Public endpoint to verify a document by verification ID.
+    This is the endpoint that QR codes / links point to.
     """
     doc = await db.document_verifications.find_one({"id": verify_id})
 
@@ -679,7 +706,8 @@ async def verify_document(verify_id: str):
             "location": "Juba City, South Sudan",
             "website": "https://heavenlynatureschools.com",
         }
-    }
+        }
+    
 
 # ─────────────────────────────────────────────────────────────
 # LIVE CHAT ROUTES
