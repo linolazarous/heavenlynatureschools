@@ -19,6 +19,7 @@ import EventDetail from './pages/EventDetail';
 import SchoolLive from './pages/SchoolLive';
 import Contact from './pages/Contact';
 import SchoolVerify from './pages/SchoolVerify';
+import VerifyCertificate from './pages/VerifyCertificate'; // ✅ Document verification
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -27,10 +28,10 @@ import AdminContacts from './pages/admin/AdminContacts';
 import AdminBlog from './pages/admin/AdminBlog';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminSettings from './pages/admin/AdminSettings';
-import ManageAdmins from './pages/admin/ManageAdmins'; // ✅ Import ManageAdmins
+import ManageAdmins from './pages/admin/ManageAdmins';
 import AdminLayout from './layouts/AdminLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { adminApi } from './utils/api'; // ✅ Import adminApi for super admin check
+import { adminApi } from './utils/api';
 import './App.css';
 
 // ✅ Protected Route Component
@@ -78,7 +79,7 @@ function App() {
             <Header />
             <main>
               <Routes>
-                {/* Public Routes */}
+                {/* ─── Public Routes ─── */}
                 <Route path="/" element={<Home />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/vision" element={<Vision />} />
@@ -92,14 +93,19 @@ function App() {
                 <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/school/live" element={<SchoolLive />} />
                 <Route path="/contact" element={<Contact />} />
-                <Route path="/verify/:id" element={<SchoolVerify />} />
+                
+                {/* ✅ Verification Routes */}
+                <Route path="/verify/:id" element={<VerifyRouter />} />
+                <Route path="/verify/id/:id" element={<SchoolVerify />} />
+                <Route path="/verify/document/:id" element={<VerifyCertificate />} />
+                
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 
-                {/* Admin Auth Route */}
+                {/* ─── Admin Auth Route (No Layout) ─── */}
                 <Route path="/admin/login" element={<AdminLogin />} />
                 
-                {/* Protected Admin Routes with Layout */}
+                {/* ─── Protected Admin Routes with Layout ─── */}
                 <Route path="/admin" element={
                   <ProtectedRoute>
                     <AdminLayout />
@@ -109,6 +115,13 @@ function App() {
                   <Route path="contacts" element={<AdminContacts />} />
                   <Route path="blog" element={<AdminBlog />} />
                   <Route path="events" element={<AdminEvents />} />
+                  
+                  {/* ✅ ID Cards - handled by dashboard tabs */}
+                  <Route path="id-cards" element={<AdminDashboard />} />
+                  
+                  {/* ✅ Verification QR Codes - handled by dashboard tabs */}
+                  <Route path="verifications" element={<AdminDashboard />} />
+                  
                   <Route path="settings" element={<AdminSettings />} />
                   
                   {/* ✅ Manage Admins Route - Super Admin Only */}
@@ -119,7 +132,7 @@ function App() {
                   } />
                 </Route>
                 
-                {/* Catch all - redirect to home */}
+                {/* ─── Catch all - redirect to home ─── */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
@@ -131,5 +144,67 @@ function App() {
     </HelmetProvider>
   );
 }
+
+// ✅ Verify Router - Auto-detects ID card vs Document verification
+const VerifyRouter = () => {
+  const { id } = useParams();
+  const [type, setType] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkType = async () => {
+      try {
+        const API_BASE = process.env.REACT_APP_API_URL || 'https://api.heavenlynatureschools.com';
+        
+        // Try ID card verification first
+        const res = await fetch(`${API_BASE}/api/verify/${id}`);
+        const data = await res.json();
+        
+        if (data.valid && data.member) {
+          // It's an ID card
+          setType('id-card');
+        } else {
+          // Try document verification
+          const docRes = await fetch(`${API_BASE}/api/verify/document/${id}`);
+          const docData = await docRes.json();
+          
+          if (docData.valid && docData.document) {
+            setType('document');
+          } else {
+            setType('not-found');
+          }
+        }
+      } catch {
+        setType('not-found');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkType();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-muted-foreground">Verifying...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'id-card') {
+    return <SchoolVerify />;
+  }
+
+  if (type === 'document') {
+    return <VerifyCertificate />;
+  }
+
+  // Not found - show error
+  return <SchoolVerify />; // SchoolVerify handles invalid case
+};
 
 export default App;
