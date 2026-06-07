@@ -28,6 +28,20 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
+# ✅ API Base URL for generating full image URLs
+API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
+
+# ✅ Helper to generate full URL from relative path
+def get_full_url(relative_path: str) -> str:
+    """Convert relative file path to full URL using API_BASE_URL."""
+    if not relative_path:
+        return ""
+    if relative_path.startswith("http"):
+        return relative_path
+    # Ensure leading slash
+    clean_path = relative_path if relative_path.startswith("/") else f"/{relative_path}"
+    return f"{API_BASE_URL}{clean_path}" if API_BASE_URL else clean_path
+
 # Upload configuration
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
 BLOG_IMAGES_DIR = UPLOAD_DIR / "blog-images"
@@ -85,7 +99,7 @@ def validate_image(file: UploadFile) -> None:
         )
 
 async def save_upload_file(file: UploadFile, directory: Path) -> str:
-    """Save uploaded file and return the URL path."""
+    """Save uploaded file and return the RELATIVE URL path."""
     file_ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = directory / unique_filename
@@ -268,14 +282,14 @@ class ChatMessage(BaseModel):
     message: str
     username: Optional[str] = "Guest"
 
-# ✅ Document Verification Models
 class GenerateVerificationRequest(BaseModel):
-    type: str  # "report_card" or "certificate"
+    type: str
     year: str
     count: Optional[int] = 0
+    custom_date: Optional[str] = None
 
 # ─────────────────────────────────────────────────────────────
-# IMAGE UPLOAD ROUTES
+# IMAGE UPLOAD ROUTES (✅ Returning FULL URLs)
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/upload")
@@ -286,9 +300,10 @@ async def upload_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    image_url = await save_upload_file(image, BLOG_IMAGES_DIR)
-    logger.info(f"Image uploaded by {user.get('email')}: {image_url}")
-    return {"url": image_url, "imageUrl": image_url, "message": "Image uploaded successfully"}
+    relative_url = await save_upload_file(image, BLOG_IMAGES_DIR)
+    full_url = get_full_url(relative_url)
+    logger.info(f"Image uploaded by {user.get('email')}: {full_url}")
+    return {"url": full_url, "imageUrl": full_url, "message": "Image uploaded successfully"}
 
 @api_router.post("/upload/blog-image")
 async def upload_blog_image(
@@ -298,9 +313,10 @@ async def upload_blog_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    image_url = await save_upload_file(image, BLOG_IMAGES_DIR)
-    logger.info(f"Blog image uploaded by {user.get('email')}: {image_url}")
-    return {"url": image_url, "imageUrl": image_url, "message": "Blog image uploaded successfully"}
+    relative_url = await save_upload_file(image, BLOG_IMAGES_DIR)
+    full_url = get_full_url(relative_url)
+    logger.info(f"Blog image uploaded by {user.get('email')}: {full_url}")
+    return {"url": full_url, "imageUrl": full_url, "message": "Blog image uploaded successfully"}
 
 @api_router.post("/upload/event-image")
 async def upload_event_image(
@@ -310,9 +326,10 @@ async def upload_event_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    image_url = await save_upload_file(image, EVENT_IMAGES_DIR)
-    logger.info(f"Event image uploaded by {user.get('email')}: {image_url}")
-    return {"url": image_url, "imageUrl": image_url, "message": "Event image uploaded successfully"}
+    relative_url = await save_upload_file(image, EVENT_IMAGES_DIR)
+    full_url = get_full_url(relative_url)
+    logger.info(f"Event image uploaded by {user.get('email')}: {full_url}")
+    return {"url": full_url, "imageUrl": full_url, "message": "Event image uploaded successfully"}
 
 # ─────────────────────────────────────────────────────────────
 # ID CARD HELPERS
@@ -354,7 +371,7 @@ async def _generate_member_id(db, role_code: str) -> str:
     return f"{pattern}{str(count + 1).zfill(3)}"
 
 # ─────────────────────────────────────────────────────────────
-# ID CARD ROUTES
+# ID CARD ROUTES (✅ Storing FULL URLs)
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/admin/id-cards")
@@ -391,10 +408,14 @@ async def upload_id_card(
         expiry_date = _calculate_expiry(role)
 
     file_id = str(uuid.uuid4())
-    front_id_url = await save_upload_file(image, ID_PHOTOS_DIR)
+    # Save and get full URLs
+    relative_front_url = await save_upload_file(image, ID_PHOTOS_DIR)
+    front_id_url = get_full_url(relative_front_url)  # ✅ Full URL
+    
     passport_photo_url = None
     if photo and photo.filename:
-        passport_photo_url = await save_upload_file(photo, ID_PHOTOS_DIR)
+        relative_photo_url = await save_upload_file(photo, ID_PHOTOS_DIR)
+        passport_photo_url = get_full_url(relative_photo_url)  # ✅ Full URL
 
     id_card = {
         "id": file_id, "name": name.strip(), "member_id": member_id,
@@ -512,16 +533,6 @@ async def get_available_roles(user: dict = Depends(require_admin)):
     return {"staff_roles": staff_roles, "student_roles": student_roles, "all_roles": staff_roles + student_roles}
 
 # ─────────────────────────────────────────────────────────────
-# DOCUMENT VERIFICATION MODELS (Update this model)
-# ─────────────────────────────────────────────────────────────
-
-class GenerateVerificationRequest(BaseModel):
-    type: str  # "report_card" or "certificate"
-    year: str
-    count: Optional[int] = 0
-    custom_date: Optional[str] = None  # ✅ NEW: Custom creation date
-
-# ─────────────────────────────────────────────────────────────
 # DOCUMENT VERIFICATION ROUTES
 # ─────────────────────────────────────────────────────────────
 
@@ -530,23 +541,11 @@ async def generate_verification(
     data: GenerateVerificationRequest,
     user: dict = Depends(require_admin)
 ):
-    """
-    Generate a verification link for documents.
-    Types: 'report_card' or 'certificate'
-    """
     if data.type not in ["report_card", "certificate"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid type. Must be 'report_card' or 'certificate'"
-        )
-
+        raise HTTPException(status_code=400, detail="Invalid type. Must be 'report_card' or 'certificate'")
     if not data.year or not data.year.isdigit() or len(data.year) != 4:
-        raise HTTPException(
-            status_code=400,
-            detail="Year must be a valid 4-digit year (e.g., 2026)"
-        )
+        raise HTTPException(status_code=400, detail="Year must be a valid 4-digit year (e.g., 2026)")
 
-    # ✅ Parse custom date or use current time
     custom_created_at = datetime.now(timezone.utc)
     if data.custom_date:
         try:
@@ -558,54 +557,35 @@ async def generate_verification(
                 tzinfo=timezone.utc
             )
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid date format. Use YYYY-MM-DD"
-            )
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
-    # Check if verification already exists for this type and year
     existing = await db.document_verifications.find_one({
-        "type": data.type,
-        "year": data.year,
-        "is_active": True
+        "type": data.type, "year": data.year, "is_active": True
     })
-
     if existing:
-        # Return existing verification
         existing.pop("_id", None)
         return {
-            "id": existing["id"],
-            "type": existing["type"],
-            "year": existing["year"],
+            "id": existing["id"], "type": existing["type"], "year": existing["year"],
             "count": existing.get("count", 0),
             "verify_url": f"https://heavenlynatureschools.com/verify/{existing['id']}",
             "created_at": existing["created_at"],
             "message": "Verification already exists for this type and year"
         }
 
-    # Create new verification
     verify_id = str(uuid.uuid4())
     doc = {
-        "id": verify_id,
-        "type": data.type,
-        "year": data.year,
-        "count": data.count or 0,
-        "is_active": True,
+        "id": verify_id, "type": data.type, "year": data.year,
+        "count": data.count or 0, "is_active": True,
         "verify_url": f"https://heavenlynatureschools.com/verify/{verify_id}",
         "created_by": user.get("email", "unknown"),
-        "created_at": custom_created_at.isoformat(),  # ✅ Use custom date
+        "created_at": custom_created_at.isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-
     await db.document_verifications.insert_one(doc)
-
     type_label = "Academic Report Card" if data.type == "report_card" else "Certificate of Nursery Education"
     logger.info(f"{type_label} verification created for {data.year} by {user.get('email')}")
-
     return {
-        "id": verify_id,
-        "type": data.type,
-        "year": data.year,
+        "id": verify_id, "type": data.type, "year": data.year,
         "count": data.count or 0,
         "verify_url": f"https://heavenlynatureschools.com/verify/{verify_id}",
         "created_at": doc["created_at"],
@@ -614,9 +594,6 @@ async def generate_verification(
 
 @api_router.get("/admin/verifications")
 async def list_verifications(user: dict = Depends(require_admin)):
-    """
-    List all document verifications.
-    """
     verifications = await db.document_verifications.find({}).sort("created_at", -1).to_list(500)
     result = []
     for v in verifications:
@@ -626,77 +603,52 @@ async def list_verifications(user: dict = Depends(require_admin)):
 
 @api_router.put("/admin/verifications/{verify_id}/toggle")
 async def toggle_verification(verify_id: str, user: dict = Depends(require_admin)):
-    """
-    Toggle verification active status.
-    """
     doc = await db.document_verifications.find_one({"id": verify_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Verification not found")
-
     new_status = not doc.get("is_active", True)
     await db.document_verifications.update_one(
         {"id": verify_id},
         {"$set": {"is_active": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-
     logger.info(f"Verification {verify_id} {'activated' if new_status else 'deactivated'} by {user.get('email')}")
     return {"success": True, "is_active": new_status, "message": f"Verification {'activated' if new_status else 'deactivated'}"}
 
 @api_router.delete("/admin/verifications/{verify_id}")
 async def delete_verification(verify_id: str, user: dict = Depends(require_admin)):
-    """
-    Delete a verification.
-    """
     result = await db.document_verifications.delete_one({"id": verify_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Verification not found")
-
     logger.info(f"Verification {verify_id} deleted by {user.get('email')}")
     return {"success": True, "message": "Verification deleted"}
 
 @api_router.get("/verify/document/{verify_id}")
 async def verify_document(verify_id: str):
-    """
-    Public endpoint to verify a document by verification ID.
-    This is the endpoint that QR codes / links point to.
-    """
     doc = await db.document_verifications.find_one({"id": verify_id})
-
     if not doc:
         try:
             doc = await db.document_verifications.find_one({"_id": ObjectId(verify_id)})
         except:
             pass
-
     if not doc:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "valid": False,
-                "message": "This document could not be verified. It may not be an authentic document from Heavenly Nature Schools."
-            }
-        )
-
+        return JSONResponse(status_code=404, content={
+            "valid": False,
+            "message": "This document could not be verified. It may not be an authentic document from Heavenly Nature Schools."
+        })
     if not doc.get("is_active", True):
         return {
             "valid": False,
             "message": "This verification has been deactivated. Please contact the school administration."
         }
-
     doc.pop("_id", None)
     doc.pop("created_by", None)
-
     type_label = "Academic Report Card (ARC)" if doc["type"] == "report_card" else "Certificate of Nursery Education"
-
     return {
         "valid": True,
         "message": f"✅ Authentic {type_label} for {doc['year']}",
         "document": {
-            "id": doc["id"],
-            "type": doc["type"],
-            "type_label": type_label,
-            "year": doc["year"],
-            "count": doc.get("count", 0),
+            "id": doc["id"], "type": doc["type"], "type_label": type_label,
+            "year": doc["year"], "count": doc.get("count", 0),
             "created_at": doc["created_at"],
             "verified_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -706,8 +658,7 @@ async def verify_document(verify_id: str):
             "location": "Juba City, South Sudan",
             "website": "https://heavenlynatureschools.com",
         }
-        }
-    
+    }
 
 # ─────────────────────────────────────────────────────────────
 # LIVE CHAT ROUTES
@@ -727,7 +678,6 @@ async def send_chat_message(data: ChatMessage, request: Request):
                 is_admin = payload.get("role") in ["super_admin", "admin", "moderator"]
     except:
         pass
-
     message_doc = {
         "username": username, "message": data.message.strip(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -735,14 +685,12 @@ async def send_chat_message(data: ChatMessage, request: Request):
     }
     result = await db.chat_messages.insert_one(message_doc)
     message_doc["id"] = str(result.inserted_id)
-
     count = await db.chat_messages.count_documents({})
     if count > 500:
         oldest = await db.chat_messages.find({}).sort("timestamp", 1).limit(count - 500).to_list(count - 500)
         if oldest:
             old_ids = [o["_id"] for o in oldest]
             await db.chat_messages.delete_many({"_id": {"$in": old_ids}})
-
     logger.info(f"Chat message from {username}: {data.message[:50]}...")
     return {
         "success": True,
@@ -759,16 +707,13 @@ async def get_chat_messages(limit: int = Query(50, le=200), before: str = Query(
     if before: query["timestamp"] = {"$lt": before}
     messages = await db.chat_messages.find(query).sort("timestamp", -1).limit(limit).to_list(limit)
     messages.reverse()
-
     five_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     online_users = await db.chat_messages.distinct("username", {"timestamp": {"$gte": five_min_ago}})
     online_count = len(online_users)
-
     result = []
     for msg in messages:
         msg["id"] = str(msg.pop("_id"))
         result.append(msg)
-
     return {"messages": result, "online_count": online_count, "total": len(result)}
 
 @api_router.delete("/live-chat/messages/{message_id}")
@@ -991,6 +936,9 @@ async def get_blog_post(post_id: str):
 @api_router.post("/admin/blog")
 async def create_blog_post(data: BlogPostCreate, user=Depends(require_admin)):
     doc = data.model_dump()
+    # ✅ Store full URL for imageUrl if it's relative
+    if doc.get("imageUrl") and not doc["imageUrl"].startswith("http"):
+        doc["imageUrl"] = get_full_url(doc["imageUrl"])
     doc["createdAt"] = datetime.now(timezone.utc).isoformat()
     doc["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.blog_posts.insert_one(doc)
@@ -999,6 +947,9 @@ async def create_blog_post(data: BlogPostCreate, user=Depends(require_admin)):
 @api_router.put("/admin/blog/{post_id}")
 async def update_blog_post(post_id: str, data: BlogPostUpdate, user=Depends(require_admin)):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    # ✅ Store full URL for imageUrl if it's relative
+    if update_data.get("imageUrl") and not update_data["imageUrl"].startswith("http"):
+        update_data["imageUrl"] = get_full_url(update_data["imageUrl"])
     update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.blog_posts.update_one({"_id": ObjectId(post_id)}, {"$set": update_data})
     if result.matched_count == 0: raise HTTPException(status_code=404, detail="Blog post not found")
@@ -1031,6 +982,9 @@ async def get_event(event_id: str):
 @api_router.post("/admin/events")
 async def create_event(data: EventCreate, user=Depends(require_admin)):
     doc = data.model_dump()
+    # ✅ Store full URL for imageUrl if it's relative
+    if doc.get("imageUrl") and not doc["imageUrl"].startswith("http"):
+        doc["imageUrl"] = get_full_url(doc["imageUrl"])
     doc["createdAt"] = datetime.now(timezone.utc).isoformat()
     doc["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.events.insert_one(doc)
@@ -1039,6 +993,9 @@ async def create_event(data: EventCreate, user=Depends(require_admin)):
 @api_router.put("/admin/events/{event_id}")
 async def update_event(event_id: str, data: EventUpdate, user=Depends(require_admin)):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    # ✅ Store full URL for imageUrl if it's relative
+    if update_data.get("imageUrl") and not update_data["imageUrl"].startswith("http"):
+        update_data["imageUrl"] = get_full_url(update_data["imageUrl"])
     update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.events.update_one({"_id": ObjectId(event_id)}, {"$set": update_data})
     if result.matched_count == 0: raise HTTPException(status_code=404, detail="Event not found")
