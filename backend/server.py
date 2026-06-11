@@ -17,6 +17,8 @@ import uuid
 import boto3
 from botocore.config import Config
 from datetime import datetime, timezone, timedelta
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, From, To, Subject, Content, ReplyTo
 
 # ─────────────────────────────────────────────────────────────
 # CONFIG
@@ -34,6 +36,11 @@ R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
 R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
 R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")
 R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "").rstrip("/")
+
+# SendGrid Configuration
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "info@heavenlynatureschools.com")
+SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "Heavenly Nature Schools")
 
 # Upload limits
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
@@ -72,6 +79,43 @@ def upload_to_r2(file_data: bytes, filename: str, folder: str, content_type: str
     return f"{endpoint}/{R2_BUCKET_NAME}/{key}"
 
 # ─────────────────────────────────────────────────────────────
+# SENDGRID EMAIL HELPER
+# ─────────────────────────────────────────────────────────────
+
+def send_email(to_email: str, to_name: str, subject: str, html_content: str, reply_to_email: str = None) -> dict:
+    """
+    Send an email via SendGrid.
+    Returns a dict with success status and message.
+    """
+    if not SENDGRID_API_KEY:
+        logger.error("SendGrid API key not configured")
+        return {"success": False, "message": "Email service not configured"}
+
+    try:
+        message = Mail(
+            from_email=From(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
+            to_emails=To(to_email, to_name),
+            subject=Subject(subject),
+            html_content=Content("text/html", html_content),
+        )
+
+        if reply_to_email:
+            message.reply_to = ReplyTo(reply_to_email, SENDGRID_FROM_NAME)
+
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+
+        logger.info(f"Email sent to {to_email} - Status: {response.status_code}")
+        return {
+            "success": True,
+            "message": "Email sent successfully",
+            "status_code": response.status_code
+        }
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
+        return {"success": False, "message": str(e)}
+
+# ─────────────────────────────────────────────────────────────
 # DB
 # ─────────────────────────────────────────────────────────────
 
@@ -82,7 +126,7 @@ db = client[os.environ["DB_NAME"]]
 # APP
 # ─────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Heavenly Nature Schools API", version="3.0.0")
+app = FastAPI(title="Heavenly Nature Schools API", version="3.1.0")
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO)
@@ -198,6 +242,14 @@ class ContactCreate(BaseModel):
 class ContactUpdate(BaseModel):
     read: bool
 
+# ✅ Email Reply Model
+class EmailReplyRequest(BaseModel):
+    to_email: str
+    to_name: str
+    subject: str
+    message: str
+    reply_to_original: bool = False  # If True, uses the contact's original subject
+
 class BlogPostCreate(BaseModel):
     title: str
     excerpt: str
@@ -299,11 +351,9 @@ async def upload_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-
     contents = await image.read()
     if len(contents) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
-
     image_url = upload_to_r2(contents, image.filename, "blog-images", image.content_type)
     logger.info(f"Image uploaded to R2 by {user.get('email')}: {image_url}")
     return {"url": image_url, "imageUrl": image_url, "message": "Image uploaded successfully"}
@@ -316,11 +366,9 @@ async def upload_blog_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-
     contents = await image.read()
     if len(contents) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
-
     image_url = upload_to_r2(contents, image.filename, "blog-images", image.content_type)
     logger.info(f"Blog image uploaded to R2 by {user.get('email')}: {image_url}")
     return {"url": image_url, "imageUrl": image_url, "message": "Blog image uploaded successfully"}
@@ -333,11 +381,9 @@ async def upload_event_image(
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-
     contents = await image.read()
     if len(contents) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
-
     image_url = upload_to_r2(contents, image.filename, "event-images", image.content_type)
     logger.info(f"Event image uploaded to R2 by {user.get('email')}: {image_url}")
     return {"url": image_url, "imageUrl": image_url, "message": "Event image uploaded successfully"}
@@ -419,13 +465,11 @@ async def upload_id_card(
     if not expiry_date:
         expiry_date = _calculate_expiry(role)
 
-    # Upload front ID image to R2
     image_data = await image.read()
     if len(image_data) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit")
     front_id_url = upload_to_r2(image_data, image.filename, "id-cards", image.content_type)
 
-    # Upload passport photo to R2 (optional)
     passport_photo_url = None
     if photo and photo.filename:
         photo_data = await photo.read()
@@ -768,6 +812,116 @@ async def get_chat_stats(user: dict = Depends(require_admin)):
     }
 
 # ─────────────────────────────────────────────────────────────
+# EMAIL REPLY ROUTES (✅ NEW)
+# ─────────────────────────────────────────────────────────────
+
+@api_router.post("/admin/contacts/{contact_id}/reply")
+async def reply_to_contact(
+    contact_id: str,
+    data: EmailReplyRequest,
+    user: dict = Depends(require_admin)
+):
+    """
+    Reply to a contact form submission via email.
+    Sends an email to the person who submitted the contact form.
+    """
+    # Get the contact
+    try:
+        contact = await db.contacts.find_one({"_id": ObjectId(contact_id)})
+    except:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    # Build email content
+    original_subject = contact.get("subject", "Contact Form")
+    subject = f"Re: {original_subject}" if data.reply_to_original else data.subject
+
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #001f5b; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+            <h2 style="color: #ffffff; margin: 0;">Heavenly Nature Schools</h2>
+            <p style="color: #f0c040; margin: 5px 0 0 0;">Nursery & Primary School</p>
+        </div>
+        <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-radius: 0 0 10px 10px;">
+            <p style="color: #333333;">Dear <strong>{data.to_name}</strong>,</p>
+            <div style="color: #333333; line-height: 1.6;">
+                {data.message.replace(chr(10), '<br>')}
+            </div>
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 25px 0;">
+            <p style="color: #666666; font-size: 12px;">
+                This email is in response to your message to Heavenly Nature Schools.
+                <br>Original subject: <strong>{original_subject}</strong>
+            </p>
+        </div>
+        <div style="text-align: center; padding: 15px; color: #999999; font-size: 11px;">
+            <p>Heavenly Nature Nursery & Primary School — Juba City, South Sudan</p>
+            <p>"Nurturing Right Leaders"</p>
+        </div>
+    </div>
+    """
+
+    # Send email
+    result = send_email(
+        to_email=data.to_email,
+        to_name=data.to_name,
+        subject=subject,
+        html_content=html_content,
+    )
+
+    if result["success"]:
+        # Mark contact as replied
+        await db.contacts.update_one(
+            {"_id": ObjectId(contact_id)},
+            {"$set": {
+                "replied": True,
+                "replied_at": datetime.now(timezone.utc).isoformat(),
+                "replied_by": user.get("email", "unknown"),
+                "status": "replied"
+            }}
+        )
+
+        # Save sent email record
+        await db.sent_emails.insert_one({
+            "contact_id": contact_id,
+            "to_email": data.to_email,
+            "to_name": data.to_name,
+            "subject": subject,
+            "message": data.message,
+            "sent_by": user.get("email", "unknown"),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        logger.info(f"Email reply sent to {data.to_email} by {user.get('email')}")
+        return {
+            "success": True,
+            "message": f"Reply sent to {data.to_name} ({data.to_email})"
+        }
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {result['message']}")
+
+
+@api_router.get("/admin/contacts/{contact_id}/history")
+async def get_contact_email_history(
+    contact_id: str,
+    user: dict = Depends(require_admin)
+):
+    """
+    Get email reply history for a contact.
+    """
+    history = await db.sent_emails.find(
+        {"contact_id": contact_id}
+    ).sort("sent_at", -1).to_list(50)
+
+    result = []
+    for h in history:
+        h["id"] = str(h.pop("_id"))
+        result.append(h)
+
+    return {"emails": result, "total": len(result)}
+
+# ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
 # ─────────────────────────────────────────────────────────────
 
@@ -914,6 +1068,8 @@ async def submit_contact(data: ContactCreate):
     doc["date"] = datetime.now(timezone.utc).isoformat()
     doc["createdAt"] = datetime.now(timezone.utc).isoformat()
     doc["read"] = False
+    doc["replied"] = False
+    doc["status"] = "new"
     result = await db.contacts.insert_one(doc)
     return {"success": True, "id": str(result.inserted_id)}
 
@@ -1053,7 +1209,7 @@ async def health():
 
 @api_router.get("/")
 async def root():
-    return {"message": "Heavenly Nature Schools API", "version": "3.0.0", "docs": "/docs", "redoc": "/redoc"}
+    return {"message": "Heavenly Nature Schools API", "version": "3.1.0", "docs": "/docs", "redoc": "/redoc"}
 
 # ─────────────────────────────────────────────────────────────
 # STARTUP
@@ -1061,12 +1217,12 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    # Verify R2 connection (non-fatal - logs warning instead of crashing)
+    # Verify R2 connection
     try:
         s3_client.head_bucket(Bucket=R2_BUCKET_NAME)
         logger.info(f"✅ Connected to Cloudflare R2 bucket: {R2_BUCKET_NAME}")
     except Exception as e:
-        logger.warning(f"⚠️ Could not verify R2 bucket: {e} - uploads will be attempted anyway")
+        logger.warning(f"⚠️ Could not verify R2 bucket: {e}")
 
     # Create default admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
@@ -1106,8 +1262,10 @@ async def startup():
     await db.chat_messages.create_index([("timestamp", -1)])
     await db.document_verifications.create_index("id", unique=True)
     await db.document_verifications.create_index([("type", 1), ("year", 1)])
+    await db.sent_emails.create_index("contact_id")
+    await db.sent_emails.create_index("sent_at")
 
-    logger.info("✅ School API v3.0 startup complete - R2 Storage, Document Verification, Live Chat, ID Cards, Blog, Events enabled")
+    logger.info("✅ School API v3.1.0 startup complete - R2 Storage, Email, Live Chat, ID Cards, Blog, Events enabled")
 
 # ─────────────────────────────────────────────────────────────
 # CORS, ROUTER
@@ -1124,4 +1282,4 @@ app.include_router(api_router)
 
 @app.get("/")
 async def root_redirect():
-    return {"message": "Heavenly Nature Schools API", "version": "3.0.0", "docs": "/docs", "redoc": "/redoc", "api": "/api"}
+    return {"message": "Heavenly Nature Schools API", "version": "3.1.0", "docs": "/docs", "redoc": "/redoc", "api": "/api"}
