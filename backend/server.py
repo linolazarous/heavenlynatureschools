@@ -5,7 +5,6 @@ load_dotenv()
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, status, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pydantic import BaseModel
@@ -15,9 +14,9 @@ import logging
 import bcrypt
 import jwt
 import uuid
-import aiofiles
+import boto3
+from botocore.config import Config
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
 # CONFIG
@@ -28,32 +27,55 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# ✅ API Base URL for generating full image URLs
-API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
+# ✅ Cloudflare R2 Configuration
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "hns-media")
+R2_REGION = os.environ.get("R2_REGION", "auto")
+R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
+R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
+R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "").rstrip("/")
 
-# ✅ Helper to generate full URL from relative path
-def get_full_url(relative_path: str) -> str:
-    """Convert relative file path to full URL using API_BASE_URL."""
-    if not relative_path:
-        return ""
-    if relative_path.startswith("http"):
-        return relative_path
-    # Ensure leading slash
-    clean_path = relative_path if relative_path.startswith("/") else f"/{relative_path}"
-    return f"{API_BASE_URL}{clean_path}" if API_BASE_URL else clean_path
-
-# Upload configuration
-UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
-BLOG_IMAGES_DIR = UPLOAD_DIR / "blog-images"
-EVENT_IMAGES_DIR = UPLOAD_DIR / "event-images"
-ID_PHOTOS_DIR = UPLOAD_DIR / "id-photos"
+# Upload limits
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
-# Create upload directories if they don't exist
-BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-ID_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+# ─────────────────────────────────────────────────────────────
+# R2 STORAGE CLIENT
+# ─────────────────────────────────────────────────────────────
+
+s3_client = boto3.client(
+    "s3",
+    region_name=R2_REGION,
+    aws_access_key_id=R2_ACCESS_KEY,
+    aws_secret_access_key=R2_SECRET_KEY,
+    endpoint_url=R2_ENDPOINT_URL,
+    config=Config(signature_version="s3v4"),
+)
+
+def upload_to_r2(file_data: bytes, filename: str, folder: str, content_type: str) -> str:
+    """
+    Upload a file to Cloudflare R2 and return the public URL.
+    """
+    # Generate unique filename
+    file_ext = filename.split(".")[-1].lower() if "." in filename else "jpg"
+    unique_name = f"{uuid.uuid4()}.{file_ext}"
+    key = f"{folder}/{unique_name}"
+
+    # Upload to R2
+    s3_client.put_object(
+        Bucket=R2_BUCKET_NAME,
+        Key=key,
+        Body=file_data,
+        ContentType=content_type,
+        CacheControl="public, max-age=31536000, immutable",
+    )
+
+    # Return public URL
+    if R2_PUBLIC_URL:
+        return f"{R2_PUBLIC_URL}/{key}"
+    # Fallback to endpoint URL
+    endpoint = R2_ENDPOINT_URL.rstrip("/")
+    return f"{endpoint}/{R2_BUCKET_NAME}/{key}"
 
 # ─────────────────────────────────────────────────────────────
 # DB
@@ -97,23 +119,6 @@ def validate_image(file: UploadFile) -> None:
             status_code=400,
             detail=f"File type '{file.content_type}' is not allowed. Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
         )
-
-async def save_upload_file(file: UploadFile, directory: Path) -> str:
-    """Save uploaded file and return the RELATIVE URL path."""
-    file_ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = directory / unique_filename
-
-    content = await file.read()
-
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
-
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(content)
-
-    relative_path = file_path.relative_to(UPLOAD_DIR)
-    return f"/uploads/{relative_path}"
 
 # ─────────────────────────────────────────────────────────────
 # AUTH HELPERS
@@ -289,7 +294,7 @@ class GenerateVerificationRequest(BaseModel):
     custom_date: Optional[str] = None
 
 # ─────────────────────────────────────────────────────────────
-# IMAGE UPLOAD ROUTES (✅ Returning FULL URLs)
+# IMAGE UPLOAD ROUTES (✅ Cloudflare R2 Storage)
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/upload")
@@ -297,39 +302,54 @@ async def upload_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
+    """Upload an image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    relative_url = await save_upload_file(image, BLOG_IMAGES_DIR)
-    full_url = get_full_url(relative_url)
-    logger.info(f"Image uploaded by {user.get('email')}: {full_url}")
-    return {"url": full_url, "imageUrl": full_url, "message": "Image uploaded successfully"}
+
+    contents = await image.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+    image_url = upload_to_r2(contents, image.filename, "blog-images", image.content_type)
+    logger.info(f"Image uploaded to R2 by {user.get('email')}: {image_url}")
+    return {"url": image_url, "imageUrl": image_url, "message": "Image uploaded successfully"}
 
 @api_router.post("/upload/blog-image")
 async def upload_blog_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
+    """Upload a blog image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    relative_url = await save_upload_file(image, BLOG_IMAGES_DIR)
-    full_url = get_full_url(relative_url)
-    logger.info(f"Blog image uploaded by {user.get('email')}: {full_url}")
-    return {"url": full_url, "imageUrl": full_url, "message": "Blog image uploaded successfully"}
+
+    contents = await image.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+    image_url = upload_to_r2(contents, image.filename, "blog-images", image.content_type)
+    logger.info(f"Blog image uploaded to R2 by {user.get('email')}: {image_url}")
+    return {"url": image_url, "imageUrl": image_url, "message": "Blog image uploaded successfully"}
 
 @api_router.post("/upload/event-image")
 async def upload_event_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
+    """Upload an event image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
-    relative_url = await save_upload_file(image, EVENT_IMAGES_DIR)
-    full_url = get_full_url(relative_url)
-    logger.info(f"Event image uploaded by {user.get('email')}: {full_url}")
-    return {"url": full_url, "imageUrl": full_url, "message": "Event image uploaded successfully"}
+
+    contents = await image.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+    image_url = upload_to_r2(contents, image.filename, "event-images", image.content_type)
+    logger.info(f"Event image uploaded to R2 by {user.get('email')}: {image_url}")
+    return {"url": image_url, "imageUrl": image_url, "message": "Event image uploaded successfully"}
 
 # ─────────────────────────────────────────────────────────────
 # ID CARD HELPERS
@@ -371,7 +391,7 @@ async def _generate_member_id(db, role_code: str) -> str:
     return f"{pattern}{str(count + 1).zfill(3)}"
 
 # ─────────────────────────────────────────────────────────────
-# ID CARD ROUTES (✅ Storing FULL URLs)
+# ID CARD ROUTES (✅ R2 Storage)
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/admin/id-cards")
@@ -407,16 +427,20 @@ async def upload_id_card(
     if not expiry_date:
         expiry_date = _calculate_expiry(role)
 
-    file_id = str(uuid.uuid4())
-    # Save and get full URLs
-    relative_front_url = await save_upload_file(image, ID_PHOTOS_DIR)
-    front_id_url = get_full_url(relative_front_url)  # ✅ Full URL
-    
+    # Upload front ID image to R2
+    image_data = await image.read()
+    if len(image_data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit")
+    front_id_url = upload_to_r2(image_data, image.filename, "id-cards", image.content_type)
+
+    # Upload passport photo to R2 (optional)
     passport_photo_url = None
     if photo and photo.filename:
-        relative_photo_url = await save_upload_file(photo, ID_PHOTOS_DIR)
-        passport_photo_url = get_full_url(relative_photo_url)  # ✅ Full URL
+        photo_data = await photo.read()
+        if len(photo_data) <= MAX_UPLOAD_SIZE:
+            passport_photo_url = upload_to_r2(photo_data, photo.filename, "id-cards", photo.content_type)
 
+    file_id = str(uuid.uuid4())
     id_card = {
         "id": file_id, "name": name.strip(), "member_id": member_id,
         "role_code": role_code, "image_url": front_id_url,
@@ -750,9 +774,7 @@ async def get_chat_stats(user: dict = Depends(require_admin)):
 
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
-# ─────────────────────────────────────────────────────────────
-
-@api_router.post("/auth/login")
+# ─────────────────────────────────────────────────────────────@api_router.post("/auth/login")
 async def login(data: LoginRequest):
     user = await db.users.find_one({"email": data.email.lower()})
     if not user or not verify_password(data.password, user["password_hash"]):
@@ -936,9 +958,6 @@ async def get_blog_post(post_id: str):
 @api_router.post("/admin/blog")
 async def create_blog_post(data: BlogPostCreate, user=Depends(require_admin)):
     doc = data.model_dump()
-    # ✅ Store full URL for imageUrl if it's relative
-    if doc.get("imageUrl") and not doc["imageUrl"].startswith("http"):
-        doc["imageUrl"] = get_full_url(doc["imageUrl"])
     doc["createdAt"] = datetime.now(timezone.utc).isoformat()
     doc["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.blog_posts.insert_one(doc)
@@ -947,9 +966,6 @@ async def create_blog_post(data: BlogPostCreate, user=Depends(require_admin)):
 @api_router.put("/admin/blog/{post_id}")
 async def update_blog_post(post_id: str, data: BlogPostUpdate, user=Depends(require_admin)):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    # ✅ Store full URL for imageUrl if it's relative
-    if update_data.get("imageUrl") and not update_data["imageUrl"].startswith("http"):
-        update_data["imageUrl"] = get_full_url(update_data["imageUrl"])
     update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.blog_posts.update_one({"_id": ObjectId(post_id)}, {"$set": update_data})
     if result.matched_count == 0: raise HTTPException(status_code=404, detail="Blog post not found")
@@ -982,9 +998,6 @@ async def get_event(event_id: str):
 @api_router.post("/admin/events")
 async def create_event(data: EventCreate, user=Depends(require_admin)):
     doc = data.model_dump()
-    # ✅ Store full URL for imageUrl if it's relative
-    if doc.get("imageUrl") and not doc["imageUrl"].startswith("http"):
-        doc["imageUrl"] = get_full_url(doc["imageUrl"])
     doc["createdAt"] = datetime.now(timezone.utc).isoformat()
     doc["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.events.insert_one(doc)
@@ -993,9 +1006,6 @@ async def create_event(data: EventCreate, user=Depends(require_admin)):
 @api_router.put("/admin/events/{event_id}")
 async def update_event(event_id: str, data: EventUpdate, user=Depends(require_admin)):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    # ✅ Store full URL for imageUrl if it's relative
-    if update_data.get("imageUrl") and not update_data["imageUrl"].startswith("http"):
-        update_data["imageUrl"] = get_full_url(update_data["imageUrl"])
     update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.events.update_one({"_id": ObjectId(event_id)}, {"$set": update_data})
     if result.matched_count == 0: raise HTTPException(status_code=404, detail="Event not found")
@@ -1054,10 +1064,15 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    BLOG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    EVENT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    ID_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+    # Verify R2 connection
+    try:
+        s3_client.head_bucket(Bucket=R2_BUCKET_NAME)
+        logger.info(f"✅ Connected to Cloudflare R2 bucket: {R2_BUCKET_NAME}")
+    except Exception as e:
+        logger.error(f"❌ Failed to connect to R2 bucket: {e}")
+        raise RuntimeError(f"R2 connection failed: {e}")
 
+    # Create default admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
@@ -1084,6 +1099,7 @@ async def startup():
             }, "updated_at": datetime.now(timezone.utc).isoformat()
         }})
 
+    # Create indexes
     await db.contacts.create_index("createdAt")
     await db.blog_posts.create_index("publishDate")
     await db.events.create_index("eventDate")
@@ -1095,10 +1111,10 @@ async def startup():
     await db.document_verifications.create_index("id", unique=True)
     await db.document_verifications.create_index([("type", 1), ("year", 1)])
 
-    logger.info("✅ School API v3.0 startup complete - Document Verification, Live Chat, ID Cards, Blog, Events enabled")
+    logger.info("✅ School API v3.0 startup complete - R2 Storage, Document Verification, Live Chat, ID Cards, Blog, Events enabled")
 
 # ─────────────────────────────────────────────────────────────
-# CORS, STATIC FILES, ROUTER
+# CORS, ROUTER
 # ─────────────────────────────────────────────────────────────
 
 app.add_middleware(
@@ -1108,7 +1124,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.include_router(api_router)
 
 @app.get("/")
