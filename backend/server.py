@@ -27,7 +27,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# ✅ Cloudflare R2 Configuration
+# Cloudflare R2 Configuration
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "hns-media")
 R2_REGION = os.environ.get("R2_REGION", "auto")
 R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
@@ -53,15 +53,11 @@ s3_client = boto3.client(
 )
 
 def upload_to_r2(file_data: bytes, filename: str, folder: str, content_type: str) -> str:
-    """
-    Upload a file to Cloudflare R2 and return the public URL.
-    """
-    # Generate unique filename
+    """Upload a file to Cloudflare R2 and return the public URL."""
     file_ext = filename.split(".")[-1].lower() if "." in filename else "jpg"
     unique_name = f"{uuid.uuid4()}.{file_ext}"
     key = f"{folder}/{unique_name}"
 
-    # Upload to R2
     s3_client.put_object(
         Bucket=R2_BUCKET_NAME,
         Key=key,
@@ -70,10 +66,8 @@ def upload_to_r2(file_data: bytes, filename: str, folder: str, content_type: str
         CacheControl="public, max-age=31536000, immutable",
     )
 
-    # Return public URL
     if R2_PUBLIC_URL:
         return f"{R2_PUBLIC_URL}/{key}"
-    # Fallback to endpoint URL
     endpoint = R2_ENDPOINT_URL.rstrip("/")
     return f"{endpoint}/{R2_BUCKET_NAME}/{key}"
 
@@ -294,7 +288,7 @@ class GenerateVerificationRequest(BaseModel):
     custom_date: Optional[str] = None
 
 # ─────────────────────────────────────────────────────────────
-# IMAGE UPLOAD ROUTES (✅ Cloudflare R2 Storage)
+# IMAGE UPLOAD ROUTES
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/upload")
@@ -302,7 +296,6 @@ async def upload_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """Upload an image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
@@ -320,7 +313,6 @@ async def upload_blog_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """Upload a blog image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
@@ -338,7 +330,6 @@ async def upload_event_image(
     image: UploadFile = File(...),
     user: dict = Depends(require_admin)
 ):
-    """Upload an event image to Cloudflare R2."""
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="No image file provided")
     validate_image(image)
@@ -391,7 +382,7 @@ async def _generate_member_id(db, role_code: str) -> str:
     return f"{pattern}{str(count + 1).zfill(3)}"
 
 # ─────────────────────────────────────────────────────────────
-# ID CARD ROUTES (✅ R2 Storage)
+# ID CARD ROUTES
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/admin/id-cards")
@@ -418,10 +409,11 @@ async def upload_id_card(
 ):
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="Front ID image is required")
+
+    role_code = _get_role_code(role)
     if role not in ROLE_CODE_MAP:
         logger.warning(f"Unknown role '{role}' - using default code 'CM'")
 
-    role_code = _get_role_code(role)
     if not member_id:
         member_id = await _generate_member_id(db, role_code)
     if not expiry_date:
@@ -702,6 +694,7 @@ async def send_chat_message(data: ChatMessage, request: Request):
                 is_admin = payload.get("role") in ["super_admin", "admin", "moderator"]
     except:
         pass
+
     message_doc = {
         "username": username, "message": data.message.strip(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -709,12 +702,14 @@ async def send_chat_message(data: ChatMessage, request: Request):
     }
     result = await db.chat_messages.insert_one(message_doc)
     message_doc["id"] = str(result.inserted_id)
+
     count = await db.chat_messages.count_documents({})
     if count > 500:
         oldest = await db.chat_messages.find({}).sort("timestamp", 1).limit(count - 500).to_list(count - 500)
         if oldest:
             old_ids = [o["_id"] for o in oldest]
             await db.chat_messages.delete_many({"_id": {"$in": old_ids}})
+
     logger.info(f"Chat message from {username}: {data.message[:50]}...")
     return {
         "success": True,
@@ -774,7 +769,9 @@ async def get_chat_stats(user: dict = Depends(require_admin)):
 
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
-# ─────────────────────────────────────────────────────────────@api_router.post("/auth/login")
+# ─────────────────────────────────────────────────────────────
+
+@api_router.post("/auth/login")
 async def login(data: LoginRequest):
     user = await db.users.find_one({"email": data.email.lower()})
     if not user or not verify_password(data.password, user["password_hash"]):
@@ -1064,13 +1061,12 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    # Verify R2 connection
+    # Verify R2 connection (non-fatal - logs warning instead of crashing)
     try:
         s3_client.head_bucket(Bucket=R2_BUCKET_NAME)
         logger.info(f"✅ Connected to Cloudflare R2 bucket: {R2_BUCKET_NAME}")
     except Exception as e:
-        logger.error(f"❌ Failed to connect to R2 bucket: {e}")
-        raise RuntimeError(f"R2 connection failed: {e}")
+        logger.warning(f"⚠️ Could not verify R2 bucket: {e} - uploads will be attempted anyway")
 
     # Create default admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
