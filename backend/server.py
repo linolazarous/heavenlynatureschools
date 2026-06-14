@@ -15,10 +15,9 @@ import bcrypt
 import jwt
 import uuid
 import boto3
+import requests
 from botocore.config import Config
 from datetime import datetime, timezone, timedelta
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, From, To, Subject, Content, ReplyTo
 
 # ─────────────────────────────────────────────────────────────
 # CONFIG
@@ -37,10 +36,10 @@ R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
 R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")
 R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "").rstrip("/")
 
-# SendGrid Configuration
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "info@heavenlynatureschools.com")
-SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "Heavenly Nature Schools")
+# Brevo Email Configuration
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+FROM_EMAIL = os.environ.get("FROM_EMAIL", "info@heavenlynatureschools.com")
+FROM_NAME = os.environ.get("FROM_NAME", "Heavenly Nature Schools")
 
 # Upload limits
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
@@ -79,38 +78,60 @@ def upload_to_r2(file_data: bytes, filename: str, folder: str, content_type: str
     return f"{endpoint}/{R2_BUCKET_NAME}/{key}"
 
 # ─────────────────────────────────────────────────────────────
-# SENDGRID EMAIL HELPER
+# BREVO EMAIL HELPER
 # ─────────────────────────────────────────────────────────────
 
-def send_email(to_email: str, to_name: str, subject: str, html_content: str, reply_to_email: str = None) -> dict:
+def send_email(to_email: str, to_name: str, subject: str, html_content: str) -> dict:
     """
-    Send an email via SendGrid.
+    Send an email via Brevo API.
     Returns a dict with success status and message.
     """
-    if not SENDGRID_API_KEY:
-        logger.error("SendGrid API key not configured")
+    if not BREVO_API_KEY:
+        logger.error("Brevo API key not configured")
         return {"success": False, "message": "Email service not configured"}
 
     try:
-        message = Mail(
-            from_email=From(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
-            to_emails=To(to_email, to_name),
-            subject=Subject(subject),
-            html_content=Content("text/html", html_content),
-        )
-
-        if reply_to_email:
-            message.reply_to = ReplyTo(reply_to_email, SENDGRID_FROM_NAME)
-
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
-
-        logger.info(f"Email sent to {to_email} - Status: {response.status_code}")
-        return {
-            "success": True,
-            "message": "Email sent successfully",
-            "status_code": response.status_code
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
         }
+        payload = {
+            "sender": {
+                "name": FROM_NAME,
+                "email": FROM_EMAIL
+            },
+            "to": [
+                {
+                    "email": to_email,
+                    "name": to_name
+                }
+            ],
+            "replyTo": {
+                "email": FROM_EMAIL,
+                "name": FROM_NAME
+            },
+            "subject": subject,
+            "htmlContent": html_content
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+
+        if response.status_code == 201:
+            logger.info(f"Email sent to {to_email} - Status: {response.status_code}")
+            return {
+                "success": True,
+                "message": "Email sent successfully",
+                "status_code": response.status_code
+            }
+        else:
+            error_data = response.json()
+            logger.error(f"Brevo API error: {error_data}")
+            return {
+                "success": False,
+                "message": error_data.get("message", f"HTTP Error {response.status_code}")
+            }
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
         return {"success": False, "message": str(e)}
@@ -242,13 +263,12 @@ class ContactCreate(BaseModel):
 class ContactUpdate(BaseModel):
     read: bool
 
-# ✅ Email Reply Model
 class EmailReplyRequest(BaseModel):
     to_email: str
     to_name: str
     subject: str
     message: str
-    reply_to_original: bool = False  # If True, uses the contact's original subject
+    reply_to_original: bool = False
 
 class BlogPostCreate(BaseModel):
     title: str
@@ -455,11 +475,9 @@ async def upload_id_card(
 ):
     if not image or not image.filename:
         raise HTTPException(status_code=400, detail="Front ID image is required")
-
     role_code = _get_role_code(role)
     if role not in ROLE_CODE_MAP:
         logger.warning(f"Unknown role '{role}' - using default code 'CM'")
-
     if not member_id:
         member_id = await _generate_member_id(db, role_code)
     if not expiry_date:
@@ -693,13 +711,10 @@ async def verify_document(verify_id: str):
     if not doc:
         return JSONResponse(status_code=404, content={
             "valid": False,
-            "message": "This document could not be verified. It may not be an authentic document from Heavenly Nature Schools."
+            "message": "This document could not be verified."
         })
     if not doc.get("is_active", True):
-        return {
-            "valid": False,
-            "message": "This verification has been deactivated. Please contact the school administration."
-        }
+        return {"valid": False, "message": "This verification has been deactivated."}
     doc.pop("_id", None)
     doc.pop("created_by", None)
     type_label = "Academic Report Card (ARC)" if doc["type"] == "report_card" else "Certificate of Nursery Education"
@@ -738,7 +753,6 @@ async def send_chat_message(data: ChatMessage, request: Request):
                 is_admin = payload.get("role") in ["super_admin", "admin", "moderator"]
     except:
         pass
-
     message_doc = {
         "username": username, "message": data.message.strip(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -746,14 +760,12 @@ async def send_chat_message(data: ChatMessage, request: Request):
     }
     result = await db.chat_messages.insert_one(message_doc)
     message_doc["id"] = str(result.inserted_id)
-
     count = await db.chat_messages.count_documents({})
     if count > 500:
         oldest = await db.chat_messages.find({}).sort("timestamp", 1).limit(count - 500).to_list(count - 500)
         if oldest:
             old_ids = [o["_id"] for o in oldest]
             await db.chat_messages.delete_many({"_id": {"$in": old_ids}})
-
     logger.info(f"Chat message from {username}: {data.message[:50]}...")
     return {
         "success": True,
@@ -812,7 +824,7 @@ async def get_chat_stats(user: dict = Depends(require_admin)):
     }
 
 # ─────────────────────────────────────────────────────────────
-# EMAIL REPLY ROUTES (✅ NEW)
+# EMAIL REPLY ROUTES (✅ Brevo)
 # ─────────────────────────────────────────────────────────────
 
 @api_router.post("/admin/contacts/{contact_id}/reply")
@@ -821,20 +833,13 @@ async def reply_to_contact(
     data: EmailReplyRequest,
     user: dict = Depends(require_admin)
 ):
-    """
-    Reply to a contact form submission via email.
-    Sends an email to the person who submitted the contact form.
-    """
-    # Get the contact
     try:
         contact = await db.contacts.find_one({"_id": ObjectId(contact_id)})
     except:
         raise HTTPException(status_code=404, detail="Contact not found")
-
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
 
-    # Build email content
     original_subject = contact.get("subject", "Contact Form")
     subject = f"Re: {original_subject}" if data.reply_to_original else data.subject
 
@@ -862,7 +867,6 @@ async def reply_to_contact(
     </div>
     """
 
-    # Send email
     result = send_email(
         to_email=data.to_email,
         to_name=data.to_name,
@@ -871,7 +875,6 @@ async def reply_to_contact(
     )
 
     if result["success"]:
-        # Mark contact as replied
         await db.contacts.update_one(
             {"_id": ObjectId(contact_id)},
             {"$set": {
@@ -881,8 +884,6 @@ async def reply_to_contact(
                 "status": "replied"
             }}
         )
-
-        # Save sent email record
         await db.sent_emails.insert_one({
             "contact_id": contact_id,
             "to_email": data.to_email,
@@ -892,33 +893,18 @@ async def reply_to_contact(
             "sent_by": user.get("email", "unknown"),
             "sent_at": datetime.now(timezone.utc).isoformat(),
         })
-
         logger.info(f"Email reply sent to {data.to_email} by {user.get('email')}")
-        return {
-            "success": True,
-            "message": f"Reply sent to {data.to_name} ({data.to_email})"
-        }
+        return {"success": True, "message": f"Reply sent to {data.to_name} ({data.to_email})"}
     else:
         raise HTTPException(status_code=500, detail=f"Failed to send email: {result['message']}")
 
-
 @api_router.get("/admin/contacts/{contact_id}/history")
-async def get_contact_email_history(
-    contact_id: str,
-    user: dict = Depends(require_admin)
-):
-    """
-    Get email reply history for a contact.
-    """
-    history = await db.sent_emails.find(
-        {"contact_id": contact_id}
-    ).sort("sent_at", -1).to_list(50)
-
+async def get_contact_email_history(contact_id: str, user: dict = Depends(require_admin)):
+    history = await db.sent_emails.find({"contact_id": contact_id}).sort("sent_at", -1).to_list(50)
     result = []
     for h in history:
         h["id"] = str(h.pop("_id"))
         result.append(h)
-
     return {"emails": result, "total": len(result)}
 
 # ─────────────────────────────────────────────────────────────
@@ -1217,14 +1203,12 @@ async def root():
 
 @app.on_event("startup")
 async def startup():
-    # Verify R2 connection
     try:
         s3_client.head_bucket(Bucket=R2_BUCKET_NAME)
         logger.info(f"✅ Connected to Cloudflare R2 bucket: {R2_BUCKET_NAME}")
     except Exception as e:
         logger.warning(f"⚠️ Could not verify R2 bucket: {e}")
 
-    # Create default admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@heavenlynature.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
@@ -1251,7 +1235,6 @@ async def startup():
             }, "updated_at": datetime.now(timezone.utc).isoformat()
         }})
 
-    # Create indexes
     await db.contacts.create_index("createdAt")
     await db.blog_posts.create_index("publishDate")
     await db.events.create_index("eventDate")
@@ -1265,7 +1248,7 @@ async def startup():
     await db.sent_emails.create_index("contact_id")
     await db.sent_emails.create_index("sent_at")
 
-    logger.info("✅ School API v3.1.0 startup complete - R2 Storage, Email, Live Chat, ID Cards, Blog, Events enabled")
+    logger.info("✅ School API v3.1.0 startup complete - R2 Storage, Brevo Email, Live Chat, ID Cards, Blog, Events enabled")
 
 # ─────────────────────────────────────────────────────────────
 # CORS, ROUTER
