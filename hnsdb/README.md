@@ -1,6 +1,4 @@
 
-### README.md
-```markdown
 # 🏫 Heavenly Nature School Management System
 
 > **"Nurturing Right Leaders"**
@@ -135,6 +133,9 @@ A comprehensive, full-stack school management system built for **Heavenly Nature
 | **Deployment** | Render (Backend), Vercel (Frontend) |
 
 ---
+
+## 📁 Project Structure
+
 
 ## 📁 Project Structure
 
